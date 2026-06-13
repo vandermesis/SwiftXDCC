@@ -20,6 +20,7 @@ struct SearchView: View {
             downloadHeader
             Divider()
             content
+            Spacer()
         }
         .navigationTitle("Search")
         .searchable(text: $query, placement: .toolbar, prompt: "Search packages")

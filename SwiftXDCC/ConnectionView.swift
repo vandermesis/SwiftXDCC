@@ -63,7 +63,7 @@ struct ConnectionView: View {
                     .help("Add a custom server")
                 }
             } footer: {
-                Text("Switch on the servers to connect to. Search runs on channels tagged “search”.")
+                Text("Switch on the servers to connect. Search runs on channels with search tag.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -196,29 +196,27 @@ struct ConnectionView: View {
         Section {
             ForEach(client.servers.filter(\.isEnabled)) { server in
                 let state = client.nickServState(for: server)
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 10) {
-                        Image(systemName: nickServSymbol(state))
-                            .foregroundStyle(nickServColor(state))
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(server.hostname)
-                            Text(state.label)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-
-                        if nickServCanRegister(state) {
-                            Button("Register") {
-                                client.registerNickServ(on: server)
-                            }
-                            .disabled(!client.isConnected(to: server))
-                        }
+                HStack(spacing: 10) {
+                    Image(systemName: nickServSymbol(state))
+                        .foregroundStyle(nickServColor(state))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(server.hostname)
+                        Text(state.label)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
+                    Spacer()
 
-                    if state == .awaitingConfirmation {
-                        confirmationRow(for: server)
+                    if nickServCanRegister(state) {
+                        Button("Register") {
+                            client.registerNickServ(on: server)
+                        }
+                        .disabled(!client.isConnected(to: server))
                     }
+                }
+
+                if state == .awaitingConfirmation {
+                    confirmationRow(for: server)
                 }
             }
         } header: {

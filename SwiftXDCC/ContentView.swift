@@ -19,7 +19,7 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $selection) {
-                Section("XDCC") {
+                Section("SwiftXDCC") {
                     Label("Connection", systemImage: "network")
                         .tag(Panel.connection)
                     Label("Search", systemImage: "magnifyingglass")
@@ -68,13 +68,12 @@ private struct StatusFooter: View {
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-
             Spacer()
-
             Button(isBusy ? "Disconnect" : "Connect") {
-                if isBusy { client.disconnect() } else { client.connect() }
+                isBusy ? client.disconnect() : client.connect()
             }
-            .controlSize(.small)
+            .controlSize(.regular)
+            .foregroundStyle(.green)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

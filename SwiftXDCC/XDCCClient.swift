@@ -294,6 +294,7 @@ final class XDCCClient {
                                                           serverHostname: hostname)
                         return channel.pipeline.addHandlers([
                             tls,
+                            ByteToMessageHandler(IRCByteSanitizerDecoder()),
                             IRCChannelHandler(),
                             IRCSessionHandler(config: config, onEvent: onEvent)
                         ])
