@@ -41,6 +41,17 @@ struct ServerRow: View {
                         }
                     }
                 }
+
+                HStack(spacing: 6) {
+                    Text("CertFP")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    TextField("CERT ADD", text: $server.certificateCommand)
+                        .font(.system(.caption, design: .monospaced))
+                        .textFieldStyle(.roundedBorder)
+                        .autocorrectionDisabled()
+                        .help("NickServ command to register this certificate. Use %fp for the fingerprint.")
+                }
             }
 
             Spacer(minLength: 0)

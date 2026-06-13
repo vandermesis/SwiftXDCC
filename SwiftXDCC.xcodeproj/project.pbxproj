@@ -25,6 +25,7 @@
 		BA109D462FDCF1DD0076B17D /* NIOTransportServices in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D452FDCF1DD0076B17D /* NIOTransportServices */; };
 		BA109D492FDCF20F0076B17D /* NIOSSL in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D482FDCF20F0076B17D /* NIOSSL */; };
 		BA109D4C2FDCF2310076B17D /* IRC in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D4B2FDCF2310076B17D /* IRC */; };
+		BA109D5F2FDD2AEC0076B17D /* X509 in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D5E2FDD2AEC0076B17D /* X509 */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -59,6 +60,7 @@
 				BA109D332FDCF1610076B17D /* NIOFoundationEssentialsCompat in Frameworks */,
 				BA109D2B2FDCF1610076B17D /* NIOConcurrencyHelpers in Frameworks */,
 				BA109D432FDCF1610076B17D /* _NIOFileSystemFoundationCompat in Frameworks */,
+				BA109D5F2FDD2AEC0076B17D /* X509 in Frameworks */,
 				BA109D3D2FDCF1610076B17D /* NIOWebSocket in Frameworks */,
 				BA109D492FDCF20F0076B17D /* NIOSSL in Frameworks */,
 				BA109D2F2FDCF1610076B17D /* NIOEmbedded in Frameworks */,
@@ -122,6 +124,7 @@
 				BA109D452FDCF1DD0076B17D /* NIOTransportServices */,
 				BA109D482FDCF20F0076B17D /* NIOSSL */,
 				BA109D4B2FDCF2310076B17D /* IRC */,
+				BA109D5E2FDD2AEC0076B17D /* X509 */,
 			);
 			productName = SwiftXDCC;
 			productReference = BA8D369D2FDC3BD400F3F342 /* SwiftXDCC.app */;
@@ -156,6 +159,7 @@
 				BA109D442FDCF1DD0076B17D /* XCRemoteSwiftPackageReference "swift-nio-transport-services" */,
 				BA109D472FDCF20F0076B17D /* XCRemoteSwiftPackageReference "swift-nio-ssl" */,
 				BA109D4A2FDCF2310076B17D /* XCRemoteSwiftPackageReference "swift-nio-irc-client" */,
+				BA109D5D2FDD2AEC0076B17D /* XCRemoteSwiftPackageReference "swift-certificates" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BA8D369E2FDC3BD400F3F342 /* Products */;
@@ -318,6 +322,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SwiftXDCC/SwiftXDCC.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -348,6 +355,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = vandermesis.SwiftXDCC;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -363,6 +371,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SwiftXDCC/SwiftXDCC.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -393,6 +404,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = vandermesis.SwiftXDCC;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -457,6 +469,14 @@
 			requirement = {
 				kind = upToNextMajorVersion;
 				minimumVersion = 0.8.1;
+			};
+		};
+		BA109D5D2FDD2AEC0076B17D /* XCRemoteSwiftPackageReference "swift-certificates" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-certificates.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.19.1;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -546,6 +566,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = BA109D4A2FDCF2310076B17D /* XCRemoteSwiftPackageReference "swift-nio-irc-client" */;
 			productName = IRC;
+		};
+		BA109D5E2FDD2AEC0076B17D /* X509 */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA109D5D2FDD2AEC0076B17D /* XCRemoteSwiftPackageReference "swift-certificates" */;
+			productName = X509;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

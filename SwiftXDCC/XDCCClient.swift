@@ -109,13 +109,9 @@ enum XDCCHost: CaseIterable, Identifiable {
 /// Shared connection parameters fall back to sensible defaults:
 /// - `nick`: `"SwiftXDCC"`
 /// - `password`: `"swiftxdcc@vandermesis.com"`
-/// - `pemData`: when `nil`, NickServ registration uses the password only and the
-///   TLS connection is anonymous (no client certificate). When set, the PEM
-///   bytes are loaded as the client certificate/key for CertFP authentication.
-///
-/// Because the app runs in the App Sandbox, the PEM is supplied as raw bytes
-/// (read from a user-selected file via a security-scoped resource) rather than a
-/// file path the service would try to open itself.
+/// CertFP identities are generated or imported by ``CertFPIdentityStore`` and
+/// persisted in Keychain. The client keeps password authentication enabled until
+/// the current fingerprint is confirmed as registered on each network.
 @MainActor
 @Observable
 final class XDCCClient {
@@ -137,6 +133,7 @@ final class XDCCClient {
         case registered
         case failed(String)
         case log(String)
+        case nickServPasswordIdentificationStarted
         /// An inbound PRIVMSG/NOTICE forwarded to the main actor.
         case incoming(kind: IncomingKind, sender: String, target: String?, text: String)
     }
@@ -150,14 +147,15 @@ final class XDCCClient {
     var password: String
     let port: Int
 
-    /// PEM bytes (certificate + private key) for CertFP. Set from a
-    /// user-selected file before calling ``connect()``.
-    var pemData: Data?
+    let identityStore: CertFPIdentityStore
 
     /// Servers the app connects to: built-in plus any the user has added.
     /// Custom servers are persisted between launches.
     var servers: [XDCCServer] {
-        didSet { saveCustomServers() }
+        didSet {
+            saveCustomServers()
+            saveCertCommands()
+        }
     }
 
     /// Packages returned from the most recent search.
@@ -170,14 +168,27 @@ final class XDCCClient {
 
     private static let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     private static let customServersKey = "customServers"
+    private static let certCommandsKey = "certificateCommands"
 
     /// Command sent into search channels. `!s` is the common short alias.
     private static let searchCommand = "!search"
     /// How long to keep collecting streamed bot replies after issuing a search.
     private static let searchTimeout: Duration = .seconds(12)
 
+    /// Connection events are funnelled through one ordered stream so they reach
+    /// the main actor in emission order (see ``init``).
+    private let eventContinuation: AsyncStream<(UUID, Event)>.Continuation
+
     private var channelsByServer: [UUID: any Channel] = [:]
     private var registeredServers: Set<UUID> = []
+    private var pendingCertRegistrations: Set<UUID> = []
+    private var certRegistrationFailures: [UUID: String] = [:]
+    private var pendingNickServIdentifications: Set<UUID> = []
+    private var pendingNickServRegistrations: Set<UUID> = []
+    private var nickServIdentificationFailures: [UUID: String] = [:]
+    private var nickServIdentified: Set<UUID> = []
+    private var nickServAwaitingConfirmation: Set<UUID> = []
+    private var nickServAutoRetried: Set<UUID> = []
 
     /// Bumped on each search/disconnect so a stale collection window can no-op.
     private var searchGeneration = 0
@@ -189,15 +200,40 @@ final class XDCCClient {
          pemData: Data? = nil,
          port: Port = .ssl
     ) {
-        self.nick = nick ?? "paczeroko"
+        let identityStore = CertFPIdentityStore()
+        self.nick = nick ?? "SwiftXDCC"
         self.password = password ?? "swiftxdcc@vandermesis.com"
-        self.pemData = pemData
+        self.identityStore = identityStore
         self.port = port.rawValue
-        self.servers = XDCCServer.predefined + Self.loadCustomServers()
+        self.servers = Self.applyingCertCommands(
+            to: XDCCServer.predefined + Self.loadCustomServers()
+        )
+
+        let (stream, continuation) = AsyncStream.makeStream(of: (UUID, Event).self)
+        self.eventContinuation = continuation
+
+        if let pemData {
+            try? identityStore.importPEM(pemData, displayName: "Provided identity")
+        }
+
+        // Process events strictly in order. A separate Task per event can run on
+        // the main actor out of emission order, so a fast NickServ reply could be
+        // handled before the flag marking us as awaiting it — dropping the notice.
+        Task { [weak self] in
+            for await (serverID, event) in stream {
+                self?.handle(event, from: serverID)
+            }
+        }
     }
+
+    var pemData: Data? { identityStore.identity?.pemData }
 
     /// At least one server has completed registration.
     var isConnected: Bool { !registeredServers.isEmpty }
+
+    func isConnected(to server: XDCCServer) -> Bool {
+        registeredServers.contains(server.id)
+    }
 
     // MARK: - Connection
 
@@ -239,10 +275,12 @@ final class XDCCClient {
                                    password: password,
                                    host: hostname,
                                    channels: server.connectionChannels.map(\.hashName),
-                                   hasCertificate: usesCertificate)
-        let onEvent: @Sendable (Event) -> Void = { [weak self] event in
-            guard let client = self else { return }
-            Task { @MainActor in client.handle(event, from: serverID) }
+                                   hasCertificate: usesCertificate,
+                                   shouldIdentifyWithPassword: !usesCertificate
+                                    || !identityStore.isRegistered(on: hostname))
+        let continuation = eventContinuation
+        let onEvent: @Sendable (Event) -> Void = { event in
+            continuation.yield((serverID, event))
         }
         let port = port
         append("Connecting (TLS, port \(port))…", source: hostname)
@@ -282,6 +320,14 @@ final class XDCCClient {
         }
         channelsByServer.removeAll()
         registeredServers.removeAll()
+        pendingCertRegistrations.removeAll()
+        certRegistrationFailures.removeAll()
+        pendingNickServIdentifications.removeAll()
+        pendingNickServRegistrations.removeAll()
+        nickServIdentificationFailures.removeAll()
+        nickServIdentified.removeAll()
+        nickServAwaitingConfirmation.removeAll()
+        nickServAutoRetried.removeAll()
         status = .disconnected
         append("Disconnected from all servers.")
     }
@@ -371,12 +417,20 @@ final class XDCCClient {
     private func makeSSLContext() throws -> NIOSSLContext {
         var configuration = TLSConfiguration.makeClientConfiguration()
 
-        if let pemData {
-            let bytes = Array(pemData)
-            let certificates = try NIOSSLCertificate.fromPEMBytes(bytes)
-            let privateKey = try NIOSSLPrivateKey(bytes: bytes, format: .pem)
+        if let identity = identityStore.identity,
+           let certificatePEM = identity.certificatePEM,
+           let privateKeyPEM = identity.privateKeyPEM {
+            let certificates = try NIOSSLCertificate.fromPEMBytes(
+                Array(certificatePEM.utf8)
+            )
+            let privateKey = try NIOSSLPrivateKey(
+                bytes: Array(privateKeyPEM.utf8),
+                format: .pem
+            )
             configuration.certificateChain = certificates.map { .certificate($0) }
             configuration.privateKey = .privateKey(privateKey)
+        } else if identityStore.identity != nil {
+            throw CertFPError.invalidPEM
         }
 
         return try NIOSSLContext(configuration: configuration)
@@ -395,8 +449,24 @@ final class XDCCClient {
             append(message, source: label)
         case .log(let message):
             append(message, source: label)
+        case .nickServPasswordIdentificationStarted:
+            pendingNickServIdentifications.insert(serverID)
+            nickServIdentificationFailures[serverID] = nil
+            nickServIdentified.remove(serverID)
+            nickServAwaitingConfirmation.remove(serverID)
+            nickServAutoRetried.remove(serverID)
         case .incoming(kind: let kind, sender: let sender, target: let target, text: let text):
             let destination = target ?? "private"
+            if sender.caseInsensitiveCompare("NickServ") == .orderedSame,
+               handleNickServPasswordNotice(text, serverID: serverID) {
+                append("[NOTICE private] <\(sender)> \(text)", source: label)
+                return
+            }
+            if sender.caseInsensitiveCompare("NickServ") == .orderedSame,
+               handleNickServCertificateNotice(text, serverID: serverID) {
+                append("[NOTICE private] <\(sender)> \(text)", source: label)
+                return
+            }
             if kind == .privmsg,
                let offer = DCCOfferParser.parse(text, bot: sender, server: label) {
                 append("Accepted DCC offer for \(offer.fileName) from \(sender).", source: label)
@@ -484,131 +554,311 @@ final class XDCCClient {
     }
 }
 
-// MARK: - NIO session handler
+// MARK: - NickServ & CertFP authentication
 
-/// Sendable snapshot of the connection parameters handed to the NIO handler.
-private struct SessionConfig: Sendable {
-    let nick: String
-    let password: String
-    let host: String
-    let channels: [String]
-    let hasCertificate: Bool
-}
-
-/// Drives IRC registration on the event loop: sends NICK/USER, answers PING,
-/// detects successful registration, identifies with NickServ and joins channels.
-private final class IRCSessionHandler: ChannelInboundHandler {
-    typealias InboundIn = IRCMessage
-
-    private let config: SessionConfig
-    private let onEvent: @Sendable (XDCCClient.Event) -> Void
-    private var isRegistered = false
-
-    init(config: SessionConfig, onEvent: @escaping @Sendable (XDCCClient.Event) -> Void) {
-        self.config = config
-        self.onEvent = onEvent
+extension XDCCClient {
+    func certFPState(for server: XDCCServer) -> CertFPRegistrationState {
+        if pendingCertRegistrations.contains(server.id) {
+            return .registering
+        }
+        if let failure = certRegistrationFailures[server.id] {
+            return .failed(failure)
+        }
+        return identityStore.registrationState(for: server.hostname)
     }
 
-    func channelActive(context: ChannelHandlerContext) {
-        guard let nick = IRCNickName(config.nick) else {
-            onEvent(.failed("Invalid nickname: \(config.nick)"))
-            context.close(promise: nil)
+    func registerCertificate(on server: XDCCServer) {
+        guard identityStore.identity != nil else {
+            append("Generate or import a certificate first.", source: server.hostname)
+            return
+        }
+        guard registeredServers.contains(server.id),
+              let channel = channelsByServer[server.id],
+              let nickServ = IRCNickName("NickServ") else {
+            append("Connect to this server before registering CertFP.", source: server.hostname)
             return
         }
 
-        let userInfo = IRCUserInfo(username: config.nick,
-                                   hostname: config.host,
-                                   servername: config.host,
-                                   realname: "Paczeroko")
-        send(.NICK(nick), context: context)
-        send(.USER(userInfo), context: context)
-        context.fireChannelActive()
+        pendingCertRegistrations.insert(server.id)
+        certRegistrationFailures[server.id] = nil
+        let command = certificateCommand(for: server)
+        channel.writeAndFlush(
+            IRCMessage(command: .PRIVMSG([.nickname(nickServ)], command)),
+            promise: nil
+        )
+        append("Sent NickServ \(command).", source: server.hostname)
     }
 
-    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
-        let message = unwrapInboundIn(data)
+    func forgetCertificateRegistration(on server: XDCCServer) {
+        pendingCertRegistrations.remove(server.id)
+        certRegistrationFailures[server.id] = nil
+        identityStore.markUnregistered(on: server.hostname)
+    }
 
-        switch message.command {
-        case .PING(let server, let server2):
-            send(.PONG(server: server, server2: server2), context: context)
+    /// Once NickServ accepts the password, the session is authenticated, so we
+    /// can add the CertFP fingerprint right away — making future connections
+    /// passwordless. No-op without a certificate or once it's already registered.
+    private func autoRegisterCertificateIfNeeded(serverID: UUID) {
+        guard identityStore.identity != nil,
+              let server = servers.first(where: { $0.id == serverID }),
+              !identityStore.isRegistered(on: server.hostname),
+              !pendingCertRegistrations.contains(serverID) else {
+            return
+        }
+        append("NickServ authentication succeeded; registering CertFP automatically.",
+               source: server.hostname)
+        registerCertificate(on: server)
+    }
 
-        case .numeric(.replyWelcome, _), .numeric(.replyEndOfMotD, _):
-            if !isRegistered {
-                isRegistered = true
-                completeRegistration(context: context)
+    func nickServState(for server: XDCCServer) -> NickServAuthState {
+        let id = server.id
+        if pendingNickServIdentifications.contains(id)
+            || pendingNickServRegistrations.contains(id) {
+            return .checking
+        }
+        if let failure = nickServIdentificationFailures[id] {
+            return .failed(failure)
+        }
+        if nickServAwaitingConfirmation.contains(id) {
+            return .awaitingConfirmation
+        }
+        if nickServIdentified.contains(id) {
+            return .identified
+        }
+        if identityStore.identity != nil,
+           identityStore.isRegistered(on: server.hostname) {
+            return .unavailable("CertFP registered, password fallback disabled")
+        }
+        return .needsRegistration("Identify with NickServ password, or Register the nickname")
+    }
+
+    /// Retries NickServ registration after a failure, mirroring CertFP's manual
+    /// Register button. Sends `REGISTER` again with the current password.
+    func registerNickServ(on server: XDCCServer) {
+        guard registeredServers.contains(server.id) else {
+            append("Connect to this server before registering with NickServ.",
+                   source: server.hostname)
+            return
+        }
+        nickServIdentificationFailures[server.id] = nil
+        sendNickServRegister(serverID: server.id)
+    }
+
+    /// Completes a registration that requires e-mail verification by sending the
+    /// code the user received to NickServ (`CONFIRM <code>`).
+    func confirmNickServRegistration(on server: XDCCServer, code: String) {
+        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard registeredServers.contains(server.id),
+              let channel = channelsByServer[server.id],
+              let nickServ = IRCNickName("NickServ") else {
+            append("Connect to this server before confirming registration.", source: server.hostname)
+            return
+        }
+
+        nickServAwaitingConfirmation.remove(server.id)
+        nickServIdentificationFailures[server.id] = nil
+        // Reuse the registration-pending phase so the CONFIRM reply is handled.
+        pendingNickServRegistrations.insert(server.id)
+        channel.writeAndFlush(
+            IRCMessage(command: .PRIVMSG([.nickname(nickServ)], "CONFIRM \(trimmed)")),
+            promise: nil
+        )
+        append("Sent NickServ CONFIRM.", source: server.hostname)
+    }
+
+    fileprivate func handleNickServCertificateNotice(_ text: String, serverID: UUID) -> Bool {
+        guard pendingCertRegistrations.contains(serverID),
+              let server = servers.first(where: { $0.id == serverID }) else {
+            return false
+        }
+
+        let lower = text.lowercased()
+        // Rizon's reply is "<fingerprint hex> added to your access list" — the
+        // raw hex contains none of the cert keywords, so "access list" matters.
+        let mentionsCertificate = lower.contains("cert")
+            || lower.contains("fingerprint")
+            || lower.contains("ssl")
+            || lower.contains("access list")
+        let succeeded = lower.contains("added")
+            || lower.contains("already")
+            || lower.contains("success")
+        let failed = lower.contains("error")
+            || lower.contains("invalid")
+            || lower.contains("not identified")
+            || lower.contains("denied")
+            || lower.contains("unknown command")
+
+        if mentionsCertificate && succeeded {
+            pendingCertRegistrations.remove(serverID)
+            certRegistrationFailures[serverID] = nil
+            identityStore.markRegistered(on: server.hostname)
+            append("CertFP registration confirmed.", source: server.hostname)
+            return true
+        }
+        if failed {
+            pendingCertRegistrations.remove(serverID)
+            certRegistrationFailures[serverID] = text
+            append("CertFP registration failed: \(text)", source: server.hostname)
+            return true
+        }
+        return false
+    }
+
+    fileprivate func handleNickServPasswordNotice(_ text: String, serverID: UUID) -> Bool {
+        let identifying = pendingNickServIdentifications.contains(serverID)
+        let registering = pendingNickServRegistrations.contains(serverID)
+        guard identifying || registering else { return false }
+
+        let outcome = NickServNoticeOutcome(text)
+
+        // Email confirmation wins over a generic "registered" success, since a
+        // registration awaiting an emailed code isn't usable yet. The prompt can
+        // arrive in either phase (IDENTIFY to an unconfirmed nick, or after
+        // REGISTER), so it isn't gated on `registering`.
+        if outcome.awaitingConfirmation {
+            pendingNickServIdentifications.remove(serverID)
+            pendingNickServRegistrations.remove(serverID)
+            nickServIdentificationFailures[serverID] = nil
+            nickServAwaitingConfirmation.insert(serverID)
+            append("NickServ requires an e-mail verification code. Enter the code you received and tap Register.",
+                   source: serverName(serverID))
+            return true
+        }
+
+        if outcome.identified || (registering && outcome.registered) {
+            markNickServAuthenticated(serverID: serverID)
+            return true
+        }
+
+        // Only auto-register from the IDENTIFY phase, so a failed registration
+        // doesn't loop back into another REGISTER.
+        if identifying, outcome.notRegistered {
+            pendingNickServIdentifications.remove(serverID)
+            nickServIdentificationFailures[serverID] = nil
+            append("NickServ reported this nickname is not registered; sending REGISTER.",
+                   source: serverName(serverID))
+            sendNickServRegister(serverID: serverID)
+            return true
+        }
+
+        if registering, outcome.codeRejected {
+            pendingNickServIdentifications.remove(serverID)
+            pendingNickServRegistrations.remove(serverID)
+            nickServIdentificationFailures[serverID] = nil
+            nickServAwaitingConfirmation.insert(serverID)
+            append("NickServ rejected the verification code: \(text)", source: serverName(serverID))
+            return true
+        }
+
+        if outcome.failed {
+            if registering,
+               let wait = outcome.retriableWaitSeconds,
+               !nickServAutoRetried.contains(serverID),
+               registeredServers.contains(serverID) {
+                scheduleNickServRegisterRetry(serverID: serverID, after: wait)
+                return true
             }
-
-        case .numeric(let code, let args) where !isRegistered && code.rawValue >= 400:
-            onEvent(.failed("Registration error \(code.rawValue): \(args.last ?? "")"))
-
-        case .PRIVMSG(let recipients, let text):
-            onEvent(.incoming(
-                kind: .privmsg,
-                sender: sender(from: message.origin),
-                target: recipients.first?.stringValue ?? message.target,
-                text: text
-            ))
-
-        case .NOTICE(let recipients, let text):
-            onEvent(.incoming(
-                kind: .notice,
-                sender: sender(from: message.origin),
-                target: recipients.first?.stringValue ?? message.target,
-                text: text
-            ))
-
-        default:
-            break
+            pendingNickServIdentifications.remove(serverID)
+            pendingNickServRegistrations.remove(serverID)
+            nickServIdentificationFailures[serverID] = text
+            let phase = registering ? "registration" : "authentication"
+            append("NickServ \(phase) failed: \(text)", source: serverName(serverID))
+            return true
         }
 
-        context.fireChannelRead(data)
+        return false
     }
 
-    func errorCaught(context: ChannelHandlerContext, error: Error) {
-        onEvent(.failed("Connection error: \(error.localizedDescription)"))
-        context.close(promise: nil)
+    /// Defers one automatic REGISTER retry past a network's minimum-uptime rule
+    /// (e.g. "you must wait 30 seconds to register"). Falls back to the manual
+    /// Register button if the retry also fails.
+    private func scheduleNickServRegisterRetry(serverID: UUID, after seconds: Int) {
+        nickServAutoRetried.insert(serverID)
+        // Keep the row showing progress (not a failure) while we wait.
+        pendingNickServRegistrations.insert(serverID)
+        nickServIdentificationFailures[serverID] = nil
+        let wait = seconds + 5  // small buffer past the network's minimum
+        append("NickServ registration deferred by the network; retrying in \(wait)s.",
+               source: serverName(serverID))
+        Task {
+            try? await Task.sleep(for: .seconds(wait))
+            guard registeredServers.contains(serverID),
+                  channelsByServer[serverID] != nil else { return }
+            append("Retrying NickServ REGISTER.", source: serverName(serverID))
+            sendNickServRegister(serverID: serverID)
+        }
     }
 
-    func channelInactive(context: ChannelHandlerContext) {
-        onEvent(.log("Connection closed."))
-        context.fireChannelInactive()
+    /// Marks NickServ password authentication as confirmed and chains into
+    /// automatic CertFP registration so future connections can be passwordless.
+    private func markNickServAuthenticated(serverID: UUID) {
+        pendingNickServIdentifications.remove(serverID)
+        pendingNickServRegistrations.remove(serverID)
+        nickServAwaitingConfirmation.remove(serverID)
+        nickServIdentificationFailures[serverID] = nil
+        nickServIdentified.insert(serverID)
+        append("NickServ password authentication confirmed.", source: serverName(serverID))
+        autoRegisterCertificateIfNeeded(serverID: serverID)
     }
 
-    // MARK: - Helpers
-
-    private func completeRegistration(context: ChannelHandlerContext) {
-        onEvent(.registered)
-
-        // With a client certificate the server identifies us automatically via
-        // CertFP during the TLS handshake, so no NickServ command is needed.
-        // Sending one only triggers a redundant syntax-error notice.
-        if config.hasCertificate {
-            onEvent(.log("Using client certificate; NickServ identifies via CertFP automatically."))
-        } else if let nickServ = IRCNickName("NickServ") {
-            send(.PRIVMSG([.nickname(nickServ)], "IDENTIFY \(config.password)"), context: context)
-            onEvent(.log("Sent NickServ IDENTIFY using password."))
+    private func sendNickServRegister(serverID: UUID) {
+        guard let channel = channelsByServer[serverID],
+              let nickServ = IRCNickName("NickServ") else {
+            return
         }
 
-        joinChannels(context: context)
-    }
-
-    private func joinChannels(context: ChannelHandlerContext) {
-        let names = config.channels.compactMap { IRCChannelName($0) }
-        guard !names.isEmpty else { return }
-        send(.JOIN(channels: names, keys: nil), context: context)
-        onEvent(.log("Joining \(names.map(\.stringValue).joined(separator: ", "))."))
-    }
-
-    private func send(_ command: IRCCommand, context: ChannelHandlerContext) {
-        let message = IRCMessage(command: command)
-        context.writeAndFlush(NIOAny(message), promise: nil)
-    }
-
-    private func sender(from origin: String?) -> String {
-        guard let origin, !origin.isEmpty else { return "server" }
-        return origin.split(separator: "!", maxSplits: 1).first.map(String.init) ?? origin
+        pendingNickServRegistrations.insert(serverID)
+        nickServIdentified.remove(serverID)
+        nickServAwaitingConfirmation.remove(serverID)
+        let command = "REGISTER \(password) swiftxdcc@vandermesis.com"
+        channel.writeAndFlush(
+            IRCMessage(command: .PRIVMSG([.nickname(nickServ)], command)),
+            promise: nil
+        )
+        append("Sent NickServ REGISTER.", source: serverName(serverID))
     }
 }
+
+// MARK: - Per-server certificate command
+
+extension XDCCClient {
+    /// The CertFP registration command for a server, with `%fp` replaced by the
+    /// fingerprint (lowercase, no separators — the form services expect).
+    func certificateCommand(for server: XDCCServer) -> String {
+        let trimmed = server.certificateCommand.trimmingCharacters(in: .whitespaces)
+        let base = trimmed.isEmpty ? "CERT ADD" : trimmed
+        guard let fingerprint = identityStore.identity?.fingerprint else { return base }
+        let plain = fingerprint.replacingOccurrences(of: ":", with: "").lowercased()
+        return base.replacingOccurrences(of: "%fp", with: plain, options: .caseInsensitive)
+    }
+
+    /// Persists non-default per-host command overrides. Predefined servers aren't
+    /// otherwise saved, so this is what makes an edit (e.g. Rizon) stick.
+    func saveCertCommands() {
+        let overrides = servers.reduce(into: [String: String]()) { result, server in
+            let command = server.certificateCommand.trimmingCharacters(in: .whitespaces)
+            if !command.isEmpty, command != "CERT ADD" {
+                result[server.hostname.lowercased()] = command
+            }
+        }
+        UserDefaults.standard.set(overrides, forKey: Self.certCommandsKey)
+    }
+
+    static func applyingCertCommands(to servers: [XDCCServer]) -> [XDCCServer] {
+        let overrides = UserDefaults.standard
+            .dictionary(forKey: certCommandsKey) as? [String: String] ?? [:]
+        guard !overrides.isEmpty else { return servers }
+        return servers.map { server in
+            guard let command = overrides[server.hostname.lowercased()] else { return server }
+            var copy = server
+            copy.certificateCommand = command
+            return copy
+        }
+    }
+}
+
+// MARK: - Incoming message kind
 
 private extension XDCCClient.IncomingKind {
     var label: String {

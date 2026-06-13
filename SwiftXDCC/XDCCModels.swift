@@ -17,8 +17,13 @@ struct XDCCServer: Identifiable, Hashable, Codable {
     /// Whether the user has selected this server to connect to. Session-only
     /// (not persisted) and defaults to on.
     var isEnabled: Bool = true
+    /// NickServ command that registers this connection's CertFP fingerprint.
+    /// Networks differ (e.g. Rizon has no `CERT`), so it is editable. `%fp` is
+    /// replaced with the certificate fingerprint. Persisted per host by the
+    /// client (kept out of the struct's Codable form, like ``isEnabled``).
+    var certificateCommand: String = "CERT ADD"
 
-    // `isEnabled` is a per-session selection, so it is left out of persistence.
+    // `isEnabled`/`certificateCommand` are managed outside the struct's JSON.
     private enum CodingKeys: String, CodingKey {
         case id, hostname, channels, isPredefined
     }
@@ -27,12 +32,14 @@ struct XDCCServer: Identifiable, Hashable, Codable {
          hostname: String,
          channels: [XDCCChannel],
          isPredefined: Bool = false,
-         isEnabled: Bool = true) {
+         isEnabled: Bool = true,
+         certificateCommand: String = "CERT ADD") {
         self.id = id
         self.hostname = hostname
         self.channels = channels
         self.isPredefined = isPredefined
         self.isEnabled = isEnabled
+        self.certificateCommand = certificateCommand
     }
 }
 
