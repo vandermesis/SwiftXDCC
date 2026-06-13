@@ -7,20 +7,25 @@
 
 import Foundation
 import NIO
-import NIOIRC
+@preconcurrency import NIOIRC
 import NIOSSL
 
-struct XDCCChannel: Identifiable, Hashable {
+struct XDCCChannel: Identifiable, Hashable, Codable {
     let id: UUID = UUID()
     let name: String
     let type: [XDCCChannelType]
-    
+
+    // `id` is ephemeral identity, regenerated per launch, so it is not persisted.
+    private enum CodingKeys: String, CodingKey {
+        case name, type
+    }
+
     var hashName: String {
         return "#\(name)"
     }
 }
 
-enum XDCCChannelType: String, CaseIterable {
+enum XDCCChannelType: String, CaseIterable, Codable {
     case download
     case search
     case request
@@ -32,7 +37,7 @@ enum XDCCHost: CaseIterable, Identifiable {
     case scene
     case abandoned
     case custom(name: String, channels: [XDCCChannel])
-    
+
     var id: String {
         switch self {
         case .abjects, .rizon, .scene, .abandoned:
@@ -41,7 +46,7 @@ enum XDCCHost: CaseIterable, Identifiable {
             return name
         }
     }
-    
+
     var name: String {
         switch self {
         case .abjects:
@@ -56,7 +61,7 @@ enum XDCCHost: CaseIterable, Identifiable {
             return name
         }
     }
-    
+
     var channels: [XDCCChannel] {
         switch self {
         case .abjects:
@@ -91,18 +96,17 @@ enum XDCCHost: CaseIterable, Identifiable {
             return channels
         }
     }
-    
+
     static var allCases: [XDCCHost] {
         return [.abjects, .rizon, .scene, .abandoned]
     }
 }
 
-/// Service that connects to an IRC server over TLS and registers the nick with
-/// NickServ.
+/// Service that connects to every configured IRC server over TLS in parallel,
+/// registers the nick (NickServ password or CertFP), joins each server's
+/// channels, and searches the search-enabled channels for XDCC packages.
 ///
-/// All connection parameters are optional. When a value is not supplied the
-/// service falls back to a sensible default:
-/// - `host`: the first ``XDCCHost`` (`irc.abjects.net`)
+/// Shared connection parameters fall back to sensible defaults:
 /// - `nick`: `"SwiftXDCC"`
 /// - `password`: `"swiftxdcc@vandermesis.com"`
 /// - `pemData`: when `nil`, NickServ registration uses the password only and the
@@ -115,7 +119,7 @@ enum XDCCHost: CaseIterable, Identifiable {
 @MainActor
 @Observable
 final class XDCCClient {
-    
+
     enum Port: Int {
         case ssl = 6697
         case standard = 6666
@@ -128,15 +132,14 @@ final class XDCCClient {
         case failed(String)
     }
 
-    /// Events forwarded from the NIO event loop back to the main actor.
+    /// Events forwarded from a single server's NIO event loop back to the main actor.
     enum Event: Sendable {
         case registered
         case failed(String)
         case log(String)
     }
 
-    /// Resolved connection parameters. Editable from the UI while disconnected.
-    var host: String
+    /// Shared IRC identity used for every connection. Editable while disconnected.
     var nick: String
     var password: String
     let port: Int
@@ -145,29 +148,46 @@ final class XDCCClient {
     /// user-selected file before calling ``connect()``.
     var pemData: Data?
 
+    /// Servers the app connects to: built-in plus any the user has added.
+    /// Custom servers are persisted between launches.
+    var servers: [XDCCServer] {
+        didSet { saveCustomServers() }
+    }
+
+    /// Packages returned from the most recent search.
+    private(set) var results: [SearchResult] = []
+    private(set) var isSearching = false
+
     private(set) var status: Status = .disconnected
     private(set) var log: [String] = []
 
     private static let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-    private var channel: (any Channel)?
+    private static let customServersKey = "customServers"
 
-    init(host: String? = nil,
-         nick: String? = nil,
+    private var channelsByServer: [UUID: any Channel] = [:]
+    private var registeredServers: Set<UUID> = []
+
+    init(nick: String? = nil,
          password: String? = nil,
          pemData: Data? = nil,
          port: Port = .ssl
     ) {
-        self.host = host ?? XDCCHost.abjects.name
         self.nick = nick ?? "SwiftXDCC"
         self.password = password ?? "swiftxdcc@vandermesis.com"
         self.pemData = pemData
         self.port = port.rawValue
+        self.servers = XDCCServer.predefined + Self.loadCustomServers()
     }
+
+    /// At least one server has completed registration.
+    var isConnected: Bool { !registeredServers.isEmpty }
 
     // MARK: - Connection
 
+    /// Connects to every server in ``servers`` in parallel. Each connection
+    /// registers and then joins that server's channels via their hash names.
     func connect() {
-        guard channel == nil else { return }
+        guard channelsByServer.isEmpty else { return }
 
         let sslContext: NIOSSLContext
         do {
@@ -177,20 +197,31 @@ final class XDCCClient {
             return
         }
 
-        let usesCertificate = pemData != nil
         status = .connecting
-        append("Connecting to \(host):\(port) (TLS) as \(nick)…")
+        registeredServers.removeAll()
+        let usesCertificate = pemData != nil
+        append("Connecting to \(servers.count) server(s) as \(nick)…")
 
+        for server in servers {
+            connect(to: server, sslContext: sslContext, usesCertificate: usesCertificate)
+        }
+    }
+
+    private func connect(to server: XDCCServer,
+                         sslContext: NIOSSLContext,
+                         usesCertificate: Bool) {
+        let serverID = server.id
+        let hostname = server.hostname
         let config = SessionConfig(nick: nick,
                                    password: password,
-                                   host: host,
+                                   host: hostname,
+                                   channels: server.channels.map(\.hashName),
                                    hasCertificate: usesCertificate)
-        let serverHostname = host
         let onEvent: @Sendable (Event) -> Void = { [weak self] event in
-            Task { @MainActor in self?.handle(event) }
+            Task { @MainActor in self?.handle(event, from: serverID) }
         }
-        let host = host
         let port = port
+        append("[\(hostname)] Connecting (TLS, port \(port))…")
 
         Task {
             let bootstrap = ClientBootstrap(group: Self.group)
@@ -198,7 +229,7 @@ final class XDCCClient {
                 .channelInitializer { channel in
                     do {
                         let tls = try NIOSSLClientHandler(context: sslContext,
-                                                          serverHostname: serverHostname)
+                                                          serverHostname: hostname)
                         return channel.pipeline.addHandlers([
                             tls,
                             IRCChannelHandler(),
@@ -210,19 +241,81 @@ final class XDCCClient {
                 }
 
             do {
-                let channel = try await bootstrap.connect(host: host, port: port).get()
-                self.channel = channel
+                let channel = try await bootstrap.connect(host: hostname, port: port).get()
+                self.channelsByServer[serverID] = channel
             } catch {
-                self.fail("Connection failed: \(error.localizedDescription)")
+                self.handle(.failed("Connection failed: \(error.localizedDescription)"),
+                            from: serverID)
             }
         }
     }
 
     func disconnect() {
-        channel?.close(mode: .all, promise: nil)
-        channel = nil
+        for channel in channelsByServer.values {
+            channel.close(mode: .all, promise: nil)
+        }
+        channelsByServer.removeAll()
+        registeredServers.removeAll()
         status = .disconnected
-        append("Disconnected.")
+        append("Disconnected from all servers.")
+    }
+
+    // MARK: - Search
+
+    /// Searches for `query` on every connected server, messaging only channels
+    /// whose type includes ``XDCCChannelType/search``.
+    ///
+    /// - Note: Stage 1 returns mock results. The real per-network search-bot
+    ///   command syntax and reply parsing are added once confirmed.
+    func search(_ query: String) {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard isConnected else {
+            append("Connect to a server before searching.")
+            return
+        }
+
+        isSearching = true
+        results = []
+
+        var targets: [(server: XDCCServer, channel: XDCCChannel)] = []
+        for server in servers where registeredServers.contains(server.id) {
+            for channel in server.searchChannels {
+                targets.append((server, channel))
+                append("Searching \"\(trimmed)\" on \(channel.hashName) (\(server.hostname))…")
+            }
+        }
+
+        guard !targets.isEmpty else {
+            isSearching = false
+            append("No search-enabled channels on the connected servers.")
+            return
+        }
+
+        Task {
+            // Simulates the round-trip to the search bots.
+            try? await Task.sleep(for: .milliseconds(400))
+            self.results = Self.mockResults(for: trimmed, on: targets)
+            self.isSearching = false
+            self.append("Found \(self.results.count) result(s).")
+        }
+    }
+
+    /// Issues the XDCC request for a result by messaging the bot. The DCC SEND
+    /// file transfer itself is deferred to a later stage.
+    func requestDownload(_ result: SearchResult) {
+        append("Requesting \(result.fileName) — xdcc send #\(result.packNumber) from \(result.bot).")
+
+        guard let server = servers.first(where: { $0.hostname == result.server }),
+              let channel = channelsByServer[server.id],
+              let bot = IRCNickName(result.bot) else {
+            append("Not connected to \(result.server); download request not sent.")
+            return
+        }
+
+        let message = IRCMessage(command: .PRIVMSG([.nickname(bot)],
+                                                   "xdcc send #\(result.packNumber)"))
+        channel.writeAndFlush(message, promise: nil)
     }
 
     /// Appends an informational line to the log (e.g. from the UI layer).
@@ -255,17 +348,22 @@ final class XDCCClient {
 
     // MARK: - Event handling
 
-    private func handle(_ event: Event) {
+    private func handle(_ event: Event, from serverID: UUID) {
+        let label = serverName(serverID)
         switch event {
         case .registered:
-            status = .registered
-            append("Registered as \(nick).")
+            registeredServers.insert(serverID)
+            if status != .registered { status = .registered }
+            append("[\(label)] Registered.")
         case .failed(let message):
-            status = .failed(message)
-            append(message)
+            append("[\(label)] \(message)")
         case .log(let message):
-            append(message)
+            append("[\(label)] \(message)")
         }
+    }
+
+    private func serverName(_ id: UUID) -> String {
+        servers.first(where: { $0.id == id })?.hostname ?? "server"
     }
 
     private func fail(_ message: String) {
@@ -276,6 +374,45 @@ final class XDCCClient {
     private func append(_ message: String) {
         log.append(message)
     }
+
+    // MARK: - Mock search results
+
+    /// Synthesises placeholder packages so the search/results flow is testable
+    /// before the real per-network bot syntax is wired up.
+    private static func mockResults(
+        for query: String,
+        on targets: [(server: XDCCServer, channel: XDCCChannel)]
+    ) -> [SearchResult] {
+        let slug = query.replacingOccurrences(of: " ", with: ".")
+        return targets.enumerated().flatMap { index, target in
+            (1...2).map { pack in
+                SearchResult(
+                    fileName: "\(slug).Sample.\(index + 1)\(pack).mkv",
+                    size: "\(300 + pack * 150) MB",
+                    bot: "XDCCBot\(index + 1)",
+                    packNumber: pack,
+                    server: target.server.hostname,
+                    channel: target.channel.hashName
+                )
+            }
+        }
+    }
+
+    // MARK: - Persistence
+
+    private func saveCustomServers() {
+        let custom = servers.filter { !$0.isPredefined }
+        guard let data = try? JSONEncoder().encode(custom) else { return }
+        UserDefaults.standard.set(data, forKey: Self.customServersKey)
+    }
+
+    private static func loadCustomServers() -> [XDCCServer] {
+        guard let data = UserDefaults.standard.data(forKey: customServersKey),
+              let stored = try? JSONDecoder().decode([XDCCServer].self, from: data) else {
+            return []
+        }
+        return stored
+    }
 }
 
 // MARK: - NIO session handler
@@ -285,11 +422,12 @@ private struct SessionConfig: Sendable {
     let nick: String
     let password: String
     let host: String
+    let channels: [String]
     let hasCertificate: Bool
 }
 
 /// Drives IRC registration on the event loop: sends NICK/USER, answers PING,
-/// detects successful registration and identifies with NickServ.
+/// detects successful registration, identifies with NickServ and joins channels.
 private final class IRCSessionHandler: ChannelInboundHandler {
     typealias InboundIn = IRCMessage
 
@@ -364,12 +502,19 @@ private final class IRCSessionHandler: ChannelInboundHandler {
         // Sending one only triggers a redundant syntax-error notice.
         if config.hasCertificate {
             onEvent(.log("Using client certificate; NickServ identifies via CertFP automatically."))
-            return
+        } else if let nickServ = IRCNickName("NickServ") {
+            send(.PRIVMSG([.nickname(nickServ)], "IDENTIFY \(config.password)"), context: context)
+            onEvent(.log("Sent NickServ IDENTIFY using password."))
         }
 
-        guard let nickServ = IRCNickName("NickServ") else { return }
-        send(.PRIVMSG([.nickname(nickServ)], "IDENTIFY \(config.password)"), context: context)
-        onEvent(.log("Sent NickServ IDENTIFY using password."))
+        joinChannels(context: context)
+    }
+
+    private func joinChannels(context: ChannelHandlerContext) {
+        let names = config.channels.compactMap { IRCChannelName($0) }
+        guard !names.isEmpty else { return }
+        send(.JOIN(channels: names, keys: nil), context: context)
+        onEvent(.log("Joining \(names.map(\.stringValue).joined(separator: ", "))."))
     }
 
     private func send(_ command: IRCCommand, context: ChannelHandlerContext) {

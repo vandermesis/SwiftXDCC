@@ -12,25 +12,43 @@ struct ContentView: View {
     @State private var client = XDCCClient()
     @State private var showingImporter = false
     @State private var pemFileName: String?
-    @State private var servers: [XDCCHost] = XDCCHost.allCases
 
     private var isBusy: Bool {
         client.status == .connecting || client.status == .registered
     }
 
     var body: some View {
-        VStack(spacing: 20) {
-            header
-            connectionForm(client)
-            actionButtons
-            console
+        TabView {
+            connectionTab
+                .tabItem { Label("Connection", systemImage: "network") }
+
+            SearchView(client: client)
+                .tabItem { Label("Search", systemImage: "magnifyingglass") }
+
+            ConsoleView(client: client)
+                .tabItem { Label("Console", systemImage: "terminal") }
         }
-        .padding(24)
-        .frame(minWidth: 480, minHeight: 640)
-        .fileImporter(isPresented: $showingImporter,
-                      allowedContentTypes: [UTType(filenameExtension: "pem") ?? .data],
-                      allowsMultipleSelection: false) { result in
-            importCertificate(result)
+        .frame(minWidth: 520, minHeight: 640)
+    }
+
+    // MARK: - Connection tab
+
+    private var connectionTab: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 20) {
+                    header
+                    identityForm
+                    actionButtons
+                    serversLink
+                }
+                .padding(24)
+            }
+            .fileImporter(isPresented: $showingImporter,
+                          allowedContentTypes: [UTType(filenameExtension: "pem") ?? .data],
+                          allowsMultipleSelection: false) { result in
+                importCertificate(result)
+            }
         }
     }
 
@@ -69,24 +87,11 @@ struct ContentView: View {
         .foregroundStyle(statusColor)
     }
 
-    // MARK: - Connection form
+    // MARK: - Identity form
 
-    private func connectionForm(_ client: XDCCClient) -> some View {
+    private var identityForm: some View {
         GroupBox {
             VStack(spacing: 12) {
-                row("Server", systemImage: "server.rack") {
-                    Table(servers) {
-                        TableColumn("Host", value: \.name)
-                            .alignment(.leading)
-                        TableColumn("Channels") { host in
-                            Text(host.channels.map { $0.hashName }.joined(separator: ", "))
-                        }
-                        .alignment(.leading)
-                    }
-                }
-
-                Divider()
-
                 row("Nickname", systemImage: "person.fill") {
                     TextField("SwiftXDCC", text: Binding(get: { client.nick },
                                                          set: { client.nick = $0 }))
@@ -122,7 +127,7 @@ struct ContentView: View {
             }
             .padding(4)
         } label: {
-            Label("Connection", systemImage: "network")
+            Label("Identity", systemImage: "person.crop.circle")
                 .font(.headline)
         }
         .disabled(isBusy)
@@ -139,6 +144,25 @@ struct ContentView: View {
         }
     }
 
+    // MARK: - Servers
+
+    private var serversLink: some View {
+        NavigationLink {
+            ServerManagerView(client: client)
+        } label: {
+            HStack {
+                Label("Manage servers", systemImage: "server.rack")
+                Spacer()
+                Text("\(client.servers.count)")
+                    .foregroundStyle(.secondary)
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(.tertiary)
+            }
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+    }
+
     // MARK: - Actions
 
     private var actionButtons: some View {
@@ -146,7 +170,7 @@ struct ContentView: View {
             Button {
                 client.connect()
             } label: {
-                Label("Connect", systemImage: "bolt.fill")
+                Label("Connect All", systemImage: "bolt.fill")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
@@ -162,52 +186,6 @@ struct ContentView: View {
             .disabled(client.status == .disconnected)
         }
         .controlSize(.large)
-    }
-
-    // MARK: - Console
-
-    private var console: some View {
-        GroupBox {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 3) {
-                        if client.log.isEmpty {
-                            Text("No activity yet.")
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
-                            ForEach(Array(client.log.enumerated()), id: \.offset) { index, entry in
-                                Text(entry)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .textSelection(.enabled)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .id(index)
-                            }
-                        }
-                    }
-                    .padding(4)
-                }
-                .onChange(of: client.log.count) { _, count in
-                    guard count > 0 else { return }
-                    withAnimation { proxy.scrollTo(count - 1, anchor: .bottom) }
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 200)
-        } label: {
-            HStack {
-                Label("Console", systemImage: "terminal")
-                    .font(.headline)
-                Spacer()
-                Button {
-                    client.clearLog()
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.borderless)
-                .disabled(client.log.isEmpty)
-            }
-        }
     }
 
     // MARK: - Status presentation
