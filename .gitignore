@@ -117,6 +117,7 @@ iOSInjectionProject/
 #Agent settings
 .codex/
 .claude/
+docs/
 QWEN.md
 AGENTS.md
 CLAUDE.md
