@@ -48,6 +48,20 @@ extension XDCCServer {
     var searchChannels: [XDCCChannel] {
         channels.filter { $0.type.contains(.search) }
     }
+
+    /// All configured channels. Bots often require users to be present in their
+    /// download channel before accepting an XDCC request.
+    var connectionChannels: [XDCCChannel] {
+        channels
+    }
+}
+
+/// A single console log line, tagged with the network it came from (if any) so
+/// the UI can colour-code per network. `source` is `nil` for app-level lines.
+struct LogEntry: Identifiable, Hashable {
+    let id = UUID()
+    let message: String
+    let source: String?
 }
 
 /// A single XDCC package returned from a search.

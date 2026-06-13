@@ -8,7 +8,7 @@
 import Foundation
 import NIO
 @preconcurrency import NIOIRC
-import NIOSSL
+@preconcurrency import NIOSSL
 
 struct XDCCChannel: Identifiable, Hashable, Codable {
     let id: UUID = UUID()
@@ -137,6 +137,12 @@ final class XDCCClient {
         case registered
         case failed(String)
         case log(String)
+        /// An inbound PRIVMSG/NOTICE forwarded to the main actor.
+        case incoming(kind: IncomingKind, sender: String, target: String?, text: String)
+    }
+
+    enum IncomingKind: Sendable, Equatable {
+        case privmsg, notice
     }
 
     /// Shared IRC identity used for every connection. Editable while disconnected.
@@ -157,22 +163,33 @@ final class XDCCClient {
     /// Packages returned from the most recent search.
     private(set) var results: [SearchResult] = []
     private(set) var isSearching = false
+    let downloadManager = DCCDownloadManager()
 
     private(set) var status: Status = .disconnected
-    private(set) var log: [String] = []
+    private(set) var log: [LogEntry] = []
 
     private static let group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     private static let customServersKey = "customServers"
 
+    /// Command sent into search channels. `!s` is the common short alias.
+    private static let searchCommand = "!search"
+    /// How long to keep collecting streamed bot replies after issuing a search.
+    private static let searchTimeout: Duration = .seconds(12)
+
     private var channelsByServer: [UUID: any Channel] = [:]
     private var registeredServers: Set<UUID> = []
+
+    /// Bumped on each search/disconnect so a stale collection window can no-op.
+    private var searchGeneration = 0
+    /// Dedupes streamed results within the current search.
+    private var seenResultKeys: Set<String> = []
 
     init(nick: String? = nil,
          password: String? = nil,
          pemData: Data? = nil,
          port: Port = .ssl
     ) {
-        self.nick = nick ?? "SwiftXDCC"
+        self.nick = nick ?? "paczeroko"
         self.password = password ?? "swiftxdcc@vandermesis.com"
         self.pemData = pemData
         self.port = port.rawValue
@@ -221,13 +238,14 @@ final class XDCCClient {
         let config = SessionConfig(nick: nick,
                                    password: password,
                                    host: hostname,
-                                   channels: server.channels.map(\.hashName),
+                                   channels: server.connectionChannels.map(\.hashName),
                                    hasCertificate: usesCertificate)
         let onEvent: @Sendable (Event) -> Void = { [weak self] event in
-            Task { @MainActor in self?.handle(event, from: serverID) }
+            guard let client = self else { return }
+            Task { @MainActor in client.handle(event, from: serverID) }
         }
         let port = port
-        append("[\(hostname)] Connecting (TLS, port \(port))…")
+        append("Connecting (TLS, port \(port))…", source: hostname)
 
         Task {
             let bootstrap = ClientBootstrap(group: Self.group)
@@ -257,6 +275,8 @@ final class XDCCClient {
     }
 
     func disconnect() {
+        searchGeneration += 1
+        isSearching = false
         for channel in channelsByServer.values {
             channel.close(mode: .all, promise: nil)
         }
@@ -268,11 +288,9 @@ final class XDCCClient {
 
     // MARK: - Search
 
-    /// Searches for `query` on every connected server, messaging only channels
-    /// whose type includes ``XDCCChannelType/search``.
-    ///
-    /// - Note: Stage 1 returns mock results. The real per-network search-bot
-    ///   command syntax and reply parsing are added once confirmed.
+    /// Searches for `query` by sending the search command into every connected
+    /// server's search-enabled channels, then collecting the bots' streamed
+    /// replies (on the channel or privately) for a short window.
     func search(_ query: String) {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
@@ -281,46 +299,58 @@ final class XDCCClient {
             return
         }
 
-        isSearching = true
+        // Start a fresh collection window; invalidate any in-flight one.
+        searchGeneration += 1
+        let generation = searchGeneration
+        seenResultKeys.removeAll()
         results = []
+        isSearching = true
 
-        var targets: [(server: XDCCServer, channel: XDCCChannel)] = []
+        var sent = 0
         for server in servers where registeredServers.contains(server.id) {
-            for channel in server.searchChannels {
-                targets.append((server, channel))
-                append("Searching \"\(trimmed)\" on \(channel.hashName) (\(server.hostname))…")
+            guard let channel = channelsByServer[server.id] else { continue }
+            for searchChannel in server.searchChannels {
+                guard let channelName = IRCChannelName(searchChannel.hashName) else { continue }
+                let command = "\(Self.searchCommand) \(trimmed)"
+                channel.writeAndFlush(IRCMessage(command: .PRIVMSG([.channel(channelName)], command)),
+                                      promise: nil)
+                append("Sent \(command) to \(searchChannel.hashName).",
+                       source: server.hostname)
+                sent += 1
             }
         }
 
-        guard !targets.isEmpty else {
+        guard sent > 0 else {
             isSearching = false
             append("No search-enabled channels on the connected servers.")
             return
         }
 
+        append("Waiting for replies from \(sent) channel(s)…")
+
         Task {
-            // Simulates the round-trip to the search bots.
-            try? await Task.sleep(for: .milliseconds(400))
-            self.results = Self.mockResults(for: trimmed, on: targets)
+            try? await Task.sleep(for: Self.searchTimeout)
+            guard self.searchGeneration == generation else { return }
             self.isSearching = false
-            self.append("Found \(self.results.count) result(s).")
+            self.append("Search finished — \(self.results.count) result(s).")
         }
     }
 
-    /// Issues the XDCC request for a result by messaging the bot. The DCC SEND
-    /// file transfer itself is deferred to a later stage.
+    /// Issues the XDCC request for a result and waits for the bot's DCC offer.
     func requestDownload(_ result: SearchResult) {
-        append("Requesting \(result.fileName) — xdcc send #\(result.packNumber) from \(result.bot).")
+        append("Requesting \(result.fileName) — xdcc send #\(result.packNumber) from \(result.bot).",
+               source: result.server)
 
         guard let server = servers.first(where: { $0.hostname == result.server }),
               let channel = channelsByServer[server.id],
               let bot = IRCNickName(result.bot) else {
-            append("Not connected to \(result.server); download request not sent.")
+            append("Not connected; download request not sent.", source: result.server)
             return
         }
 
         let message = IRCMessage(command: .PRIVMSG([.nickname(bot)],
                                                    "xdcc send #\(result.packNumber)"))
+        downloadManager.prepare(for: result)
         channel.writeAndFlush(message, promise: nil)
     }
 
@@ -360,16 +390,72 @@ final class XDCCClient {
         case .registered:
             registeredServers.insert(serverID)
             if status != .registered { status = .registered }
-            append("[\(label)] Registered.")
+            append("Registered.", source: label)
         case .failed(let message):
-            append("[\(label)] \(message)")
+            append(message, source: label)
         case .log(let message):
-            append("[\(label)] \(message)")
+            append(message, source: label)
+        case .incoming(kind: let kind, sender: let sender, target: let target, text: let text):
+            let destination = target ?? "private"
+            if kind == .privmsg,
+               let offer = DCCOfferParser.parse(text, bot: sender, server: label) {
+                append("Accepted DCC offer for \(offer.fileName) from \(sender).", source: label)
+                downloadManager.accept(offer)
+                return
+            }
+            if kind == .notice,
+               target?.hasPrefix("#") != true,
+               handlePackageNotice(text, server: label) {
+                return
+            }
+            if shouldSuppressChannelMessage(target: target, serverID: serverID) {
+                return
+            }
+            append("[\(kind.label) \(destination)] <\(sender)> \(text)", source: label)
         }
+    }
+
+    /// Returns true when a private notice has the complete search-result format.
+    private func handlePackageNotice(
+        _ text: String,
+        server: String
+    ) -> Bool {
+        guard let result = XDCCSearchResultParser.parse(
+            text,
+            server: server
+        ) else {
+            return false
+        }
+
+        guard isSearching else { return false }
+
+        let key = "\(server.lowercased())|\(result.bot.lowercased())|\(result.packNumber)"
+        guard seenResultKeys.insert(key).inserted else { return true }
+
+        results.append(result)
+        results.sort {
+            if $0.fileName.localizedStandardCompare($1.fileName) == .orderedSame {
+                return $0.packNumber < $1.packNumber
+            }
+            return $0.fileName.localizedStandardCompare($1.fileName) == .orderedAscending
+        }
+        return true
     }
 
     private func serverName(_ id: UUID) -> String {
         servers.first(where: { $0.id == id })?.hostname ?? "server"
+    }
+
+    private func shouldSuppressChannelMessage(target: String?, serverID: UUID) -> Bool {
+        guard let target,
+              target.hasPrefix("#"),
+              let server = servers.first(where: { $0.id == serverID }),
+              let channel = server.channels.first(where: {
+                  $0.hashName.caseInsensitiveCompare(target) == .orderedSame
+              }) else {
+            return false
+        }
+        return channel.type.contains(.download)
     }
 
     private func fail(_ message: String) {
@@ -377,31 +463,8 @@ final class XDCCClient {
         append(message)
     }
 
-    private func append(_ message: String) {
-        log.append(message)
-    }
-
-    // MARK: - Mock search results
-
-    /// Synthesises placeholder packages so the search/results flow is testable
-    /// before the real per-network bot syntax is wired up.
-    private static func mockResults(
-        for query: String,
-        on targets: [(server: XDCCServer, channel: XDCCChannel)]
-    ) -> [SearchResult] {
-        let slug = query.replacingOccurrences(of: " ", with: ".")
-        return targets.enumerated().flatMap { index, target in
-            (1...2).map { pack in
-                SearchResult(
-                    fileName: "\(slug).Sample.\(index + 1)\(pack).mkv",
-                    size: "\(300 + pack * 150) MB",
-                    bot: "XDCCBot\(index + 1)",
-                    packNumber: pack,
-                    server: target.server.hostname,
-                    channel: target.channel.hashName
-                )
-            }
-        }
+    private func append(_ message: String, source: String? = nil) {
+        log.append(.init(message: message, source: source))
     }
 
     // MARK: - Persistence
@@ -456,7 +519,7 @@ private final class IRCSessionHandler: ChannelInboundHandler {
         let userInfo = IRCUserInfo(username: config.nick,
                                    hostname: config.host,
                                    servername: config.host,
-                                   realname: "SwiftXDCC User")
+                                   realname: "Paczeroko")
         send(.NICK(nick), context: context)
         send(.USER(userInfo), context: context)
         context.fireChannelActive()
@@ -478,8 +541,21 @@ private final class IRCSessionHandler: ChannelInboundHandler {
         case .numeric(let code, let args) where !isRegistered && code.rawValue >= 400:
             onEvent(.failed("Registration error \(code.rawValue): \(args.last ?? "")"))
 
-        case .NOTICE(_, let text):
-            onEvent(.log("NOTICE: \(text)"))
+        case .PRIVMSG(let recipients, let text):
+            onEvent(.incoming(
+                kind: .privmsg,
+                sender: sender(from: message.origin),
+                target: recipients.first?.stringValue ?? message.target,
+                text: text
+            ))
+
+        case .NOTICE(let recipients, let text):
+            onEvent(.incoming(
+                kind: .notice,
+                sender: sender(from: message.origin),
+                target: recipients.first?.stringValue ?? message.target,
+                text: text
+            ))
 
         default:
             break
@@ -526,5 +602,19 @@ private final class IRCSessionHandler: ChannelInboundHandler {
     private func send(_ command: IRCCommand, context: ChannelHandlerContext) {
         let message = IRCMessage(command: command)
         context.writeAndFlush(NIOAny(message), promise: nil)
+    }
+
+    private func sender(from origin: String?) -> String {
+        guard let origin, !origin.isEmpty else { return "server" }
+        return origin.split(separator: "!", maxSplits: 1).first.map(String.init) ?? origin
+    }
+}
+
+private extension XDCCClient.IncomingKind {
+    var label: String {
+        switch self {
+        case .privmsg: "PRIVMSG"
+        case .notice: "NOTICE"
+        }
     }
 }
