@@ -12,47 +12,37 @@ struct ConsoleView: View {
     let client: XDCCClient
 
     var body: some View {
-        GroupBox {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 3) {
-                        if client.log.isEmpty {
-                            Text("No activity yet.")
-                                .font(.callout)
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        } else {
-                            ForEach(Array(client.log.enumerated()), id: \.offset) { index, entry in
-                                Text(entry)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .textSelection(.enabled)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .id(index)
-                            }
-                        }
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(Array(client.log.enumerated()), id: \.offset) { index, entry in
+                        Text(entry)
+                            .font(.system(.caption, design: .monospaced))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .id(index)
                     }
-                    .padding(4)
                 }
-                .onChange(of: client.log.count) { _, count in
-                    guard count > 0 else { return }
-                    withAnimation { proxy.scrollTo(count - 1, anchor: .bottom) }
-                }
+                .padding(12)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } label: {
-            HStack {
-                Label("Console", systemImage: "terminal")
-                    .font(.headline)
-                Spacer()
-                Button {
-                    client.clearLog()
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.borderless)
-                .disabled(client.log.isEmpty)
+            .onChange(of: client.log.count) { _, count in
+                guard count > 0 else { return }
+                withAnimation { proxy.scrollTo(count - 1, anchor: .bottom) }
             }
         }
-        .padding()
+        .overlay {
+            if client.log.isEmpty {
+                ContentUnavailableView("No Activity",
+                                       systemImage: "terminal",
+                                       description: Text("Connection and search activity appears here."))
+            }
+        }
+        .navigationTitle("Console")
+        .toolbar {
+            Button("Clear", systemImage: "trash") {
+                client.clearLog()
+            }
+            .disabled(client.log.isEmpty)
+        }
     }
 }

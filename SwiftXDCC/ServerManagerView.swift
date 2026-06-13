@@ -7,71 +7,53 @@
 
 import SwiftUI
 
-/// Lists every configured server and lets the user add or remove custom ones.
-struct ServerManagerView: View {
-    let client: XDCCClient
-    @State private var showingAdd = false
+/// A server row inside the connection form: an enable switch, hostname, origin
+/// tag, channels with type chips, and (for custom servers) a remove button.
+struct ServerRow: View {
+    @Binding var server: XDCCServer
+    let onRemove: () -> Void
 
     var body: some View {
-        List {
-            ForEach(client.servers) { server in
-                ServerRow(server: server)
-                    .contextMenu {
-                        if !server.isPredefined {
-                            Button("Remove", role: .destructive) { remove(server) }
+        HStack(alignment: .top, spacing: 12) {
+            Toggle("", isOn: $server.isEnabled)
+                .labelsHidden()
+                .toggleStyle(.switch)
+
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Text(server.hostname)
+                        .font(.callout.weight(.medium))
+                    if !server.isPredefined {
+                        Text("custom")
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.tint.opacity(0.15), in: Capsule())
+                    }
+                }
+
+                ForEach(server.channels) { channel in
+                    HStack(spacing: 6) {
+                        Text(channel.hashName)
+                            .font(.system(.caption, design: .monospaced))
+                        ForEach(channel.type, id: \.self) { type in
+                            ChannelTypeChip(type: type)
                         }
                     }
-            }
-        }
-        .navigationTitle("Servers")
-        .toolbar {
-            Button {
-                showingAdd = true
-            } label: {
-                Label("Add Server", systemImage: "plus")
-            }
-        }
-        .sheet(isPresented: $showingAdd) {
-            AddServerView { newServer in
-                client.servers.append(newServer)
-            }
-        }
-    }
-
-    private func remove(_ server: XDCCServer) {
-        client.servers.removeAll { $0.id == server.id }
-    }
-}
-
-/// One server row: hostname, an origin tag, and its channels with type chips.
-private struct ServerRow: View {
-    let server: XDCCServer
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text(server.hostname)
-                    .font(.callout.weight(.medium))
-                if !server.isPredefined {
-                    Text("custom")
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(.tint.opacity(0.15), in: Capsule())
                 }
             }
 
-            ForEach(server.channels) { channel in
-                HStack(spacing: 6) {
-                    Text(channel.hashName)
-                        .font(.system(.caption, design: .monospaced))
-                    ForEach(channel.type, id: \.self) { type in
-                        ChannelTypeChip(type: type)
-                    }
+            Spacer(minLength: 0)
+
+            if !server.isPredefined {
+                Button(role: .destructive, action: onRemove) {
+                    Image(systemName: "trash")
                 }
+                .buttonStyle(.borderless)
             }
         }
         .padding(.vertical, 4)
+        .opacity(server.isEnabled ? 1 : 0.5)
     }
 }
 

@@ -14,15 +14,25 @@ struct XDCCServer: Identifiable, Hashable, Codable {
     var hostname: String
     var channels: [XDCCChannel]
     let isPredefined: Bool
+    /// Whether the user has selected this server to connect to. Session-only
+    /// (not persisted) and defaults to on.
+    var isEnabled: Bool = true
+
+    // `isEnabled` is a per-session selection, so it is left out of persistence.
+    private enum CodingKeys: String, CodingKey {
+        case id, hostname, channels, isPredefined
+    }
 
     init(id: UUID = UUID(),
          hostname: String,
          channels: [XDCCChannel],
-         isPredefined: Bool = false) {
+         isPredefined: Bool = false,
+         isEnabled: Bool = true) {
         self.id = id
         self.hostname = hostname
         self.channels = channels
         self.isPredefined = isPredefined
+        self.isEnabled = isEnabled
     }
 }
 

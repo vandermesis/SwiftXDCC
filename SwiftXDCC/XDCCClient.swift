@@ -189,6 +189,12 @@ final class XDCCClient {
     func connect() {
         guard channelsByServer.isEmpty else { return }
 
+        let active = servers.filter(\.isEnabled)
+        guard !active.isEmpty else {
+            append("No servers selected. Enable at least one server to connect.")
+            return
+        }
+
         let sslContext: NIOSSLContext
         do {
             sslContext = try makeSSLContext()
@@ -200,9 +206,9 @@ final class XDCCClient {
         status = .connecting
         registeredServers.removeAll()
         let usesCertificate = pemData != nil
-        append("Connecting to \(servers.count) server(s) as \(nick)…")
+        append("Connecting to \(active.count) server(s) as \(nick)…")
 
-        for server in servers {
+        for server in active {
             connect(to: server, sslContext: sslContext, usesCertificate: usesCertificate)
         }
     }
