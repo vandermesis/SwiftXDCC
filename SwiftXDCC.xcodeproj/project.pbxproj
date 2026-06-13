@@ -7,11 +7,28 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		BA109D002FDC62AB0076B17D /* IRC in Frameworks */ = {isa = PBXBuildFile; productRef = BA109CFF2FDC62AB0076B17D /* IRC */; };
-		BA109D052FDC7CC00076B17D /* NIOSSL in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D042FDC7CC00076B17D /* NIOSSL */; };
+		BA109D1F2FDCED3F0076B17D /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = BA109D1E2FDCED3F0076B17D /* README.md */; };
+		BA109D292FDCF1610076B17D /* NIO in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D282FDCF1610076B17D /* NIO */; };
+		BA109D2B2FDCF1610076B17D /* NIOConcurrencyHelpers in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D2A2FDCF1610076B17D /* NIOConcurrencyHelpers */; };
+		BA109D2D2FDCF1610076B17D /* NIOCore in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D2C2FDCF1610076B17D /* NIOCore */; };
+		BA109D2F2FDCF1610076B17D /* NIOEmbedded in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D2E2FDCF1610076B17D /* NIOEmbedded */; };
+		BA109D312FDCF1610076B17D /* NIOFoundationCompat in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D302FDCF1610076B17D /* NIOFoundationCompat */; };
+		BA109D332FDCF1610076B17D /* NIOFoundationEssentialsCompat in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D322FDCF1610076B17D /* NIOFoundationEssentialsCompat */; };
+		BA109D352FDCF1610076B17D /* NIOHTTP1 in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D342FDCF1610076B17D /* NIOHTTP1 */; };
+		BA109D372FDCF1610076B17D /* NIOPosix in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D362FDCF1610076B17D /* NIOPosix */; };
+		BA109D392FDCF1610076B17D /* NIOTLS in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D382FDCF1610076B17D /* NIOTLS */; };
+		BA109D3B2FDCF1610076B17D /* NIOTestUtils in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D3A2FDCF1610076B17D /* NIOTestUtils */; };
+		BA109D3D2FDCF1610076B17D /* NIOWebSocket in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D3C2FDCF1610076B17D /* NIOWebSocket */; };
+		BA109D3F2FDCF1610076B17D /* _NIOConcurrency in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D3E2FDCF1610076B17D /* _NIOConcurrency */; };
+		BA109D412FDCF1610076B17D /* _NIOFileSystem in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D402FDCF1610076B17D /* _NIOFileSystem */; };
+		BA109D432FDCF1610076B17D /* _NIOFileSystemFoundationCompat in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D422FDCF1610076B17D /* _NIOFileSystemFoundationCompat */; };
+		BA109D462FDCF1DD0076B17D /* NIOTransportServices in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D452FDCF1DD0076B17D /* NIOTransportServices */; };
+		BA109D492FDCF20F0076B17D /* NIOSSL in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D482FDCF20F0076B17D /* NIOSSL */; };
+		BA109D4C2FDCF2310076B17D /* IRC in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D4B2FDCF2310076B17D /* IRC */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		BA109D1E2FDCED3F0076B17D /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		BA8D369D2FDC3BD400F3F342 /* SwiftXDCC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SwiftXDCC.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -28,8 +45,23 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BA109D052FDC7CC00076B17D /* NIOSSL in Frameworks */,
-				BA109D002FDC62AB0076B17D /* IRC in Frameworks */,
+				BA109D2D2FDCF1610076B17D /* NIOCore in Frameworks */,
+				BA109D372FDCF1610076B17D /* NIOPosix in Frameworks */,
+				BA109D312FDCF1610076B17D /* NIOFoundationCompat in Frameworks */,
+				BA109D462FDCF1DD0076B17D /* NIOTransportServices in Frameworks */,
+				BA109D3F2FDCF1610076B17D /* _NIOConcurrency in Frameworks */,
+				BA109D292FDCF1610076B17D /* NIO in Frameworks */,
+				BA109D352FDCF1610076B17D /* NIOHTTP1 in Frameworks */,
+				BA109D3B2FDCF1610076B17D /* NIOTestUtils in Frameworks */,
+				BA109D392FDCF1610076B17D /* NIOTLS in Frameworks */,
+				BA109D412FDCF1610076B17D /* _NIOFileSystem in Frameworks */,
+				BA109D4C2FDCF2310076B17D /* IRC in Frameworks */,
+				BA109D332FDCF1610076B17D /* NIOFoundationEssentialsCompat in Frameworks */,
+				BA109D2B2FDCF1610076B17D /* NIOConcurrencyHelpers in Frameworks */,
+				BA109D432FDCF1610076B17D /* _NIOFileSystemFoundationCompat in Frameworks */,
+				BA109D3D2FDCF1610076B17D /* NIOWebSocket in Frameworks */,
+				BA109D492FDCF20F0076B17D /* NIOSSL in Frameworks */,
+				BA109D2F2FDCF1610076B17D /* NIOEmbedded in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -41,6 +73,7 @@
 			children = (
 				BA8D369F2FDC3BD400F3F342 /* SwiftXDCC */,
 				BA8D369E2FDC3BD400F3F342 /* Products */,
+				BA109D1E2FDCED3F0076B17D /* README.md */,
 			);
 			sourceTree = "<group>";
 		};
@@ -72,8 +105,23 @@
 			);
 			name = SwiftXDCC;
 			packageProductDependencies = (
-				BA109CFF2FDC62AB0076B17D /* IRC */,
-				BA109D042FDC7CC00076B17D /* NIOSSL */,
+				BA109D282FDCF1610076B17D /* NIO */,
+				BA109D2A2FDCF1610076B17D /* NIOConcurrencyHelpers */,
+				BA109D2C2FDCF1610076B17D /* NIOCore */,
+				BA109D2E2FDCF1610076B17D /* NIOEmbedded */,
+				BA109D302FDCF1610076B17D /* NIOFoundationCompat */,
+				BA109D322FDCF1610076B17D /* NIOFoundationEssentialsCompat */,
+				BA109D342FDCF1610076B17D /* NIOHTTP1 */,
+				BA109D362FDCF1610076B17D /* NIOPosix */,
+				BA109D382FDCF1610076B17D /* NIOTLS */,
+				BA109D3A2FDCF1610076B17D /* NIOTestUtils */,
+				BA109D3C2FDCF1610076B17D /* NIOWebSocket */,
+				BA109D3E2FDCF1610076B17D /* _NIOConcurrency */,
+				BA109D402FDCF1610076B17D /* _NIOFileSystem */,
+				BA109D422FDCF1610076B17D /* _NIOFileSystemFoundationCompat */,
+				BA109D452FDCF1DD0076B17D /* NIOTransportServices */,
+				BA109D482FDCF20F0076B17D /* NIOSSL */,
+				BA109D4B2FDCF2310076B17D /* IRC */,
 			);
 			productName = SwiftXDCC;
 			productReference = BA8D369D2FDC3BD400F3F342 /* SwiftXDCC.app */;
@@ -104,8 +152,10 @@
 			mainGroup = BA8D36942FDC3BD400F3F342;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				BA109CFE2FDC62AB0076B17D /* XCRemoteSwiftPackageReference "swift-nio-irc-client" */,
-				BA109D032FDC7CC00076B17D /* XCRemoteSwiftPackageReference "swift-nio-ssl" */,
+				BA109D272FDCF1610076B17D /* XCRemoteSwiftPackageReference "swift-nio" */,
+				BA109D442FDCF1DD0076B17D /* XCRemoteSwiftPackageReference "swift-nio-transport-services" */,
+				BA109D472FDCF20F0076B17D /* XCRemoteSwiftPackageReference "swift-nio-ssl" */,
+				BA109D4A2FDCF2310076B17D /* XCRemoteSwiftPackageReference "swift-nio-irc-client" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = BA8D369E2FDC3BD400F3F342 /* Products */;
@@ -122,6 +172,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BA109D1F2FDCED3F0076B17D /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -273,6 +324,7 @@
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6H3JCHA3QJ;
 				ENABLE_APP_SANDBOX = YES;
+				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
@@ -285,8 +337,9 @@
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
-				ENABLE_USER_SELECTED_FILES = readonly;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -316,6 +369,7 @@
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6H3JCHA3QJ;
 				ENABLE_APP_SANDBOX = YES;
+				ENABLE_FILE_ACCESS_DOWNLOADS_FOLDER = readwrite;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_INCOMING_NETWORK_CONNECTIONS = YES;
 				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
@@ -328,8 +382,9 @@
 				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
 				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
 				ENABLE_RESOURCE_ACCESS_USB = NO;
-				ENABLE_USER_SELECTED_FILES = readonly;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -372,15 +427,23 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		BA109CFE2FDC62AB0076B17D /* XCRemoteSwiftPackageReference "swift-nio-irc-client" */ = {
+		BA109D272FDCF1610076B17D /* XCRemoteSwiftPackageReference "swift-nio" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/NozeIO/swift-nio-irc-client";
+			repositoryURL = "https://github.com/apple/swift-nio.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.8.1;
+				minimumVersion = 2.101.0;
 			};
 		};
-		BA109D032FDC7CC00076B17D /* XCRemoteSwiftPackageReference "swift-nio-ssl" */ = {
+		BA109D442FDCF1DD0076B17D /* XCRemoteSwiftPackageReference "swift-nio-transport-services" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-nio-transport-services";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.28.0;
+			};
+		};
+		BA109D472FDCF20F0076B17D /* XCRemoteSwiftPackageReference "swift-nio-ssl" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/apple/swift-nio-ssl";
 			requirement = {
@@ -388,18 +451,101 @@
 				minimumVersion = 2.37.1;
 			};
 		};
+		BA109D4A2FDCF2310076B17D /* XCRemoteSwiftPackageReference "swift-nio-irc-client" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/NozeIO/swift-nio-irc-client";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.8.1;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		BA109CFF2FDC62AB0076B17D /* IRC */ = {
+		BA109D282FDCF1610076B17D /* NIO */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = BA109CFE2FDC62AB0076B17D /* XCRemoteSwiftPackageReference "swift-nio-irc-client" */;
-			productName = IRC;
+			package = BA109D272FDCF1610076B17D /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = NIO;
 		};
-		BA109D042FDC7CC00076B17D /* NIOSSL */ = {
+		BA109D2A2FDCF1610076B17D /* NIOConcurrencyHelpers */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = BA109D032FDC7CC00076B17D /* XCRemoteSwiftPackageReference "swift-nio-ssl" */;
+			package = BA109D272FDCF1610076B17D /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = NIOConcurrencyHelpers;
+		};
+		BA109D2C2FDCF1610076B17D /* NIOCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA109D272FDCF1610076B17D /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = NIOCore;
+		};
+		BA109D2E2FDCF1610076B17D /* NIOEmbedded */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA109D272FDCF1610076B17D /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = NIOEmbedded;
+		};
+		BA109D302FDCF1610076B17D /* NIOFoundationCompat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA109D272FDCF1610076B17D /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = NIOFoundationCompat;
+		};
+		BA109D322FDCF1610076B17D /* NIOFoundationEssentialsCompat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA109D272FDCF1610076B17D /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = NIOFoundationEssentialsCompat;
+		};
+		BA109D342FDCF1610076B17D /* NIOHTTP1 */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA109D272FDCF1610076B17D /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = NIOHTTP1;
+		};
+		BA109D362FDCF1610076B17D /* NIOPosix */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA109D272FDCF1610076B17D /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = NIOPosix;
+		};
+		BA109D382FDCF1610076B17D /* NIOTLS */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA109D272FDCF1610076B17D /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = NIOTLS;
+		};
+		BA109D3A2FDCF1610076B17D /* NIOTestUtils */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA109D272FDCF1610076B17D /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = NIOTestUtils;
+		};
+		BA109D3C2FDCF1610076B17D /* NIOWebSocket */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA109D272FDCF1610076B17D /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = NIOWebSocket;
+		};
+		BA109D3E2FDCF1610076B17D /* _NIOConcurrency */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA109D272FDCF1610076B17D /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = _NIOConcurrency;
+		};
+		BA109D402FDCF1610076B17D /* _NIOFileSystem */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA109D272FDCF1610076B17D /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = _NIOFileSystem;
+		};
+		BA109D422FDCF1610076B17D /* _NIOFileSystemFoundationCompat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA109D272FDCF1610076B17D /* XCRemoteSwiftPackageReference "swift-nio" */;
+			productName = _NIOFileSystemFoundationCompat;
+		};
+		BA109D452FDCF1DD0076B17D /* NIOTransportServices */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA109D442FDCF1DD0076B17D /* XCRemoteSwiftPackageReference "swift-nio-transport-services" */;
+			productName = NIOTransportServices;
+		};
+		BA109D482FDCF20F0076B17D /* NIOSSL */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA109D472FDCF20F0076B17D /* XCRemoteSwiftPackageReference "swift-nio-ssl" */;
 			productName = NIOSSL;
+		};
+		BA109D4B2FDCF2310076B17D /* IRC */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = BA109D4A2FDCF2310076B17D /* XCRemoteSwiftPackageReference "swift-nio-irc-client" */;
+			productName = IRC;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
