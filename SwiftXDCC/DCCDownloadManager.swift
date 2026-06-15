@@ -296,7 +296,12 @@ enum DCCOfferParser {
         options: [.caseInsensitive]
     )
 
+    /// Caps regex input length to bound worst-case matching on hostile input.
+    /// Real CTCP DCC offers are well under this.
+    private static let maxInputLength = 1024
+
     static func parse(_ text: String, bot: String, server: String) -> DCCOffer? {
+        guard text.count <= maxInputLength else { return nil }
         let cleaned = text.trimmingCharacters(
             in: CharacterSet(charactersIn: "\u{01}").union(.whitespacesAndNewlines)
         )

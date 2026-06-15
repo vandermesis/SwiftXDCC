@@ -294,7 +294,12 @@ final class XDCCClient {
                                                           serverHostname: hostname)
                         return channel.pipeline.addHandlers([
                             tls,
-                            ByteToMessageHandler(IRCByteSanitizerDecoder()),
+                            // Bound the framing buffer so a hostile server can't
+                            // exhaust memory by never sending a newline. IRC lines
+                            // are ≤512 bytes (IRCv3 tags push this to ~8.7 KB);
+                            // 16 KB leaves generous headroom before we close.
+                            ByteToMessageHandler(IRCByteSanitizerDecoder(),
+                                                 maximumBufferSize: 16 * 1024),
                             IRCChannelHandler(),
                             IRCSessionHandler(config: config, onEvent: onEvent)
                         ])

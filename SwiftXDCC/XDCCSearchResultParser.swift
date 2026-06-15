@@ -23,10 +23,15 @@ struct XDCCSearchResultParser {
         pattern: #"\[\s*([^\[\]]+?)\s*\]"#
     )
 
+    /// Caps regex input length to bound worst-case matching on hostile input.
+    /// Real search notices are far shorter than this.
+    private static let maxInputLength = 4096
+
     static func parse(
         _ rawText: String,
         server: String
     ) -> SearchResult? {
+        guard rawText.count <= maxInputLength else { return nil }
         let text = stripIRCFormatting(from: rawText)
         let fullRange = NSRange(text.startIndex..., in: text)
 

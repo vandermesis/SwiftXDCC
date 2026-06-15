@@ -61,4 +61,11 @@ struct XDCCSearchResultParserTests {
     func rejectsNonResults(_ text: String) {
         #expect(XDCCSearchResultParser.parse(text, server: "irc.abjects.net") == nil)
     }
+
+    @Test("Rejects over-long input before running the regex")
+    func rejectsOversizedInput() {
+        let padded = "/msg Bot XDCC SEND #1 Clip.mkv [350M] "
+            + String(repeating: "x", count: 4100)
+        #expect(XDCCSearchResultParser.parse(padded, server: "irc.abjects.net") == nil)
+    }
 }

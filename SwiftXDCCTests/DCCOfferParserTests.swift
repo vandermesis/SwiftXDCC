@@ -76,4 +76,10 @@ struct DCCOfferParserTests {
     func rejectsInvalid(_ text: String) {
         #expect(DCCOfferParser.parse(text, bot: "Bot", server: "s") == nil)
     }
+
+    @Test("Rejects over-long input before running the regex")
+    func rejectsOversizedInput() {
+        let padded = "DCC SEND f.bin 1.2.3.4 5000 10 " + String(repeating: "A", count: 1100)
+        #expect(DCCOfferParser.parse(padded, bot: "Bot", server: "s") == nil)
+    }
 }
