@@ -26,9 +26,6 @@
 		BA109D492FDCF20F0076B17D /* NIOSSL in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D482FDCF20F0076B17D /* NIOSSL */; };
 		BA109D4C2FDCF2310076B17D /* IRC in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D4B2FDCF2310076B17D /* IRC */; };
 		BA109D5F2FDD2AEC0076B17D /* X509 in Frameworks */ = {isa = PBXBuildFile; productRef = BA109D5E2FDD2AEC0076B17D /* X509 */; };
-		BA508A4F2FDD982B00DFB1C3 /* Connect.png in Resources */ = {isa = PBXBuildFile; fileRef = BA508A4B2FDD982B00DFB1C3 /* Connect.png */; };
-		BA508A502FDD982B00DFB1C3 /* Search.png in Resources */ = {isa = PBXBuildFile; fileRef = BA508A4D2FDD982B00DFB1C3 /* Search.png */; };
-		BA508A512FDD982B00DFB1C3 /* Console.png in Resources */ = {isa = PBXBuildFile; fileRef = BA508A4C2FDD982B00DFB1C3 /* Console.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -43,9 +40,6 @@
 
 /* Begin PBXFileReference section */
 		BA109D1E2FDCED3F0076B17D /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
-		BA508A4B2FDD982B00DFB1C3 /* Connect.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Connect.png; sourceTree = "<group>"; };
-		BA508A4C2FDD982B00DFB1C3 /* Console.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Console.png; sourceTree = "<group>"; };
-		BA508A4D2FDD982B00DFB1C3 /* Search.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Search.png; sourceTree = "<group>"; };
 		BA8D369D2FDC3BD400F3F342 /* SwiftXDCC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SwiftXDCC.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		CA0000000000000000000002 /* SwiftXDCCTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SwiftXDCCTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -99,23 +93,12 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		BA508A4E2FDD982B00DFB1C3 /* ProductArtifacts */ = {
-			isa = PBXGroup;
-			children = (
-				BA508A4B2FDD982B00DFB1C3 /* Connect.png */,
-				BA508A4C2FDD982B00DFB1C3 /* Console.png */,
-				BA508A4D2FDD982B00DFB1C3 /* Search.png */,
-			);
-			path = ProductArtifacts;
-			sourceTree = "<group>";
-		};
 		BA8D36942FDC3BD400F3F342 = {
 			isa = PBXGroup;
 			children = (
 				BA8D369F2FDC3BD400F3F342 /* SwiftXDCC */,
 				CA0000000000000000000003 /* SwiftXDCCTests */,
 				BA8D369E2FDC3BD400F3F342 /* Products */,
-				BA508A4E2FDD982B00DFB1C3 /* ProductArtifacts */,
 				BA109D1E2FDCED3F0076B17D /* README.md */,
 			);
 			sourceTree = "<group>";
@@ -245,9 +228,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				BA508A4F2FDD982B00DFB1C3 /* Connect.png in Resources */,
-				BA508A502FDD982B00DFB1C3 /* Search.png in Resources */,
-				BA508A512FDD982B00DFB1C3 /* Console.png in Resources */,
 				BA109D1F2FDCED3F0076B17D /* README.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
