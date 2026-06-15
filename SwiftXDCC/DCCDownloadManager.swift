@@ -176,6 +176,18 @@ final class DCCDownloadManager {
     }
 
     private func handle(_ event: DCCTransferEvent, for id: UUID) {
+        // Terminal states are sticky. Events hop to the main actor in separate
+        // tasks, so a late `progress`/`connected` can arrive after the session's
+        // `completed`/`failed` and must not regress the row.
+        if let item = items.first(where: { $0.id == id }) {
+            switch item.state {
+            case .completed, .failed:
+                return
+            default:
+                break
+            }
+        }
+
         switch event {
         case .connected:
             update(id) { $0.state = .downloading }
@@ -364,9 +376,14 @@ private final class DCCTransferSession: @unchecked Sendable {
     private let onEvent: @Sendable (DCCTransferEvent) -> Void
     private let queue = DispatchQueue(label: "SwiftXDCC.DCCTransfer")
 
+    /// Fail an offer that never connects (e.g. NAT-blocked / unreachable host)
+    /// instead of leaving the row stuck on "Connecting".
+    private static let connectTimeout: DispatchTimeInterval = .seconds(20)
+
     private var connection: NWConnection?
     private var fileHandle: FileHandle?
     private var receivedBytes: Int64 = 0
+    private var didConnect = false
     private var isFinished = false
 
     init(
@@ -400,13 +417,23 @@ private final class DCCTransferSession: @unchecked Sendable {
             self?.handle(state)
         }
         connection.start(queue: queue)
+
+        queue.asyncAfter(deadline: .now() + Self.connectTimeout) { [weak self] in
+            guard let self, !self.isFinished, !self.didConnect else { return }
+            self.finish(.failed("Timed out connecting to \(self.offer.host)."))
+        }
     }
 
     private func handle(_ state: NWConnection.State) {
         switch state {
         case .ready:
+            didConnect = true
             onEvent(.connected)
             receiveNextChunk()
+        case .waiting(let error):
+            // The path can't be established (refused / unreachable / NAT-blocked);
+            // NWConnection would otherwise retry indefinitely, so fail promptly.
+            finish(.failed(error.localizedDescription))
         case .failed(let error):
             finish(.failed(error.localizedDescription))
         case .cancelled:
@@ -426,14 +453,20 @@ private final class DCCTransferSession: @unchecked Sendable {
             guard let self else { return }
 
             if let data, !data.isEmpty {
-                do {
-                    try self.fileHandle?.write(contentsOf: data)
-                    self.receivedBytes += Int64(data.count)
-                    self.sendAcknowledgement()
-                    self.onEvent(.progress(self.receivedBytes))
-                } catch {
-                    self.finish(.failed(error.localizedDescription))
-                    return
+                // Never write past the offered size: a misbehaving bot can send
+                // extra bytes, and the final file must match the offer exactly.
+                let remaining = self.offer.byteCount - self.receivedBytes
+                let usable = remaining > 0 ? data.prefix(Int(min(remaining, Int64(data.count)))) : Data()
+                if !usable.isEmpty {
+                    do {
+                        try self.fileHandle?.write(contentsOf: usable)
+                        self.receivedBytes += Int64(usable.count)
+                        self.sendAcknowledgement()
+                        self.onEvent(.progress(self.receivedBytes))
+                    } catch {
+                        self.finish(.failed(error.localizedDescription))
+                        return
+                    }
                 }
             }
 
