@@ -124,6 +124,13 @@ final class DCCDownloadManager {
             )
         }
 
+        guard !DCCHostPolicy.isBlocked(offer.host) else {
+            update(id) {
+                $0.state = .failed("Refused offer from a private or loopback address (\(offer.host)).")
+            }
+            return
+        }
+
         do {
             let destination = try makeDestination(for: offer.fileName)
             update(id) { $0.fileURL = destination.url }
@@ -342,6 +349,35 @@ enum DCCOfferParser {
         ]
         .map(String.init)
         .joined(separator: ".")
+    }
+}
+
+/// Guards against DCC offers that point at our own network. A public bot's
+/// offer should resolve to a routable address; loopback, private (RFC-1918),
+/// link-local, or unspecified hosts are a red flag (e.g. an attacker steering a
+/// transfer at a service on the user's machine or LAN), so they're refused.
+///
+/// The offer parser already rejects any host without a `.`, so IPv6 literals and
+/// bare `localhost` never reach here; this focuses on dotted IPv4.
+enum DCCHostPolicy {
+    static func isBlocked(_ host: String) -> Bool {
+        if host.caseInsensitiveCompare("localhost") == .orderedSame { return true }
+        guard let octets = ipv4Octets(host) else { return false }
+        if octets[0] == 0 || octets[0] == 127 || octets[0] == 10 { return true }
+        if octets[0] == 172, (16...31).contains(octets[1]) { return true }
+        if octets[0] == 192, octets[1] == 168 { return true }
+        if octets[0] == 169, octets[1] == 254 { return true }
+        return false
+    }
+
+    private static func ipv4Octets(_ host: String) -> [Int]? {
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 4 else { return nil }
+        let octets = parts.compactMap { Int($0) }
+        guard octets.count == 4, octets.allSatisfy({ (0...255).contains($0) }) else {
+            return nil
+        }
+        return octets
     }
 }
 
