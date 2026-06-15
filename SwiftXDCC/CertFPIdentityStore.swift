@@ -259,16 +259,24 @@ final class CertFPIdentityStore {
         }.joined(separator: ":")
     }
 
+    /// Keep the private key off iCloud Keychain, device backups, and migration.
+    private static let keychainAccessible = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+
     private static func saveIdentity(_ identity: CertFPIdentity) throws {
         let data = try JSONEncoder().encode(identity)
         let query = baseKeychainQuery
-        let update: [String: Any] = [kSecValueData as String: data]
+        // Re-pin accessibility on update too, so identities stored before this
+        // hardening migrate to the stricter (device-only) protection.
+        let update: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: keychainAccessible
+        ]
         var status = SecItemUpdate(query as CFDictionary, update as CFDictionary)
 
         if status == errSecItemNotFound {
             var add = query
             add[kSecValueData as String] = data
-            add[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlocked
+            add[kSecAttrAccessible as String] = keychainAccessible
             status = SecItemAdd(add as CFDictionary, nil)
         }
         try check(status)
