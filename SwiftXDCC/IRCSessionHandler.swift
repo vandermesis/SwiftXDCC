@@ -165,6 +165,7 @@ final class IRCSessionHandler: ChannelInboundHandler {
         }
 
         if config.shouldIdentifyWithPassword,
+           !config.password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
            let nickServ = IRCNickName("NickServ") {
             onEvent(.nickServPasswordIdentificationStarted)
             onEvent(.log("NickServ password fallback is active because the current fingerprint is not registered yet."))

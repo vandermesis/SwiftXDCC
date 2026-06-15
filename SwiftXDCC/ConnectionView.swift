@@ -34,6 +34,10 @@ struct ConnectionView: View {
                     .disabled(isBusy)
                 SecureField("NickServ Password", text: $client.password)
                     .disabled(isBusy)
+                TextField("Registration E-mail", text: $client.email)
+                    .autocorrectionDisabled()
+                    .textContentType(.username)
+                    .disabled(isBusy)
                 certificateSection
                     .disabled(isBusy)
             }

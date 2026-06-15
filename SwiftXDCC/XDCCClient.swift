@@ -106,9 +106,9 @@ enum XDCCHost: CaseIterable, Identifiable {
 /// registers the nick (NickServ password or CertFP), joins each server's
 /// channels, and searches the search-enabled channels for XDCC packages.
 ///
-/// Shared connection parameters fall back to sensible defaults:
-/// - `nick`: `"SwiftXDCC"`
-/// - `password`: `"swiftxdcc@vandermesis.com"`
+/// The nick defaults to `"SwiftXDCC"`; the NickServ password and registration
+/// e-mail are supplied by the user (empty by default — no credentials are baked
+/// into the binary).
 /// CertFP identities are generated or imported by ``CertFPIdentityStore`` and
 /// persisted in Keychain. The client keeps password authentication enabled until
 /// the current fingerprint is confirmed as registered on each network.
@@ -145,6 +145,9 @@ final class XDCCClient {
     /// Shared IRC identity used for every connection. Editable while disconnected.
     var nick: String
     var password: String
+    /// E-mail address sent with NickServ `REGISTER` (networks require one and
+    /// deliver the verification code there). User-supplied; empty by default.
+    var email: String
     let port: Int
 
     let identityStore: CertFPIdentityStore
@@ -197,12 +200,14 @@ final class XDCCClient {
 
     init(nick: String? = nil,
          password: String? = nil,
+         email: String? = nil,
          pemData: Data? = nil,
          port: Port = .ssl
     ) {
         let identityStore = CertFPIdentityStore()
         self.nick = nick ?? "SwiftXDCC"
-        self.password = password ?? "swiftxdcc@vandermesis.com"
+        self.password = password ?? ""
+        self.email = email ?? ""
         self.identityStore = identityStore
         self.port = port.rawValue
         self.servers = Self.applyingCertCommands(
@@ -814,10 +819,21 @@ extension XDCCClient {
             return
         }
 
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedEmail.isEmpty else {
+            pendingNickServIdentifications.remove(serverID)
+            pendingNickServRegistrations.remove(serverID)
+            nickServIdentificationFailures[serverID] =
+                "Enter a registration e-mail in Connection settings, then Register."
+            append("Registration needs an e-mail address; add one in Connection settings.",
+                   source: serverName(serverID))
+            return
+        }
+
         pendingNickServRegistrations.insert(serverID)
         nickServIdentified.remove(serverID)
         nickServAwaitingConfirmation.remove(serverID)
-        let command = "REGISTER \(password) swiftxdcc@vandermesis.com"
+        let command = "REGISTER \(password) \(trimmedEmail)"
         channel.writeAndFlush(
             IRCMessage(command: .PRIVMSG([.nickname(nickServ)], command)),
             promise: nil
