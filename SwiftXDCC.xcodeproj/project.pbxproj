@@ -31,18 +31,34 @@
 		BA508A512FDD982B00DFB1C3 /* Console.png in Resources */ = {isa = PBXBuildFile; fileRef = BA508A4C2FDD982B00DFB1C3 /* Console.png */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		CA000000000000000000000B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BA8D36952FDC3BD400F3F342 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BA8D369C2FDC3BD400F3F342;
+			remoteInfo = SwiftXDCC;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		BA109D1E2FDCED3F0076B17D /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 		BA508A4B2FDD982B00DFB1C3 /* Connect.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Connect.png; sourceTree = "<group>"; };
 		BA508A4C2FDD982B00DFB1C3 /* Console.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Console.png; sourceTree = "<group>"; };
 		BA508A4D2FDD982B00DFB1C3 /* Search.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = Search.png; sourceTree = "<group>"; };
 		BA8D369D2FDC3BD400F3F342 /* SwiftXDCC.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SwiftXDCC.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CA0000000000000000000002 /* SwiftXDCCTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SwiftXDCCTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		BA8D369F2FDC3BD400F3F342 /* SwiftXDCC */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = SwiftXDCC;
+			sourceTree = "<group>";
+		};
+		CA0000000000000000000003 /* SwiftXDCCTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = SwiftXDCCTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -73,6 +89,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CA0000000000000000000005 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -90,6 +113,7 @@
 			isa = PBXGroup;
 			children = (
 				BA8D369F2FDC3BD400F3F342 /* SwiftXDCC */,
+				CA0000000000000000000003 /* SwiftXDCCTests */,
 				BA8D369E2FDC3BD400F3F342 /* Products */,
 				BA508A4E2FDD982B00DFB1C3 /* ProductArtifacts */,
 				BA109D1E2FDCED3F0076B17D /* README.md */,
@@ -100,6 +124,7 @@
 			isa = PBXGroup;
 			children = (
 				BA8D369D2FDC3BD400F3F342 /* SwiftXDCC.app */,
+				CA0000000000000000000002 /* SwiftXDCCTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -147,6 +172,28 @@
 			productReference = BA8D369D2FDC3BD400F3F342 /* SwiftXDCC.app */;
 			productType = "com.apple.product-type.application";
 		};
+		CA0000000000000000000001 /* SwiftXDCCTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CA0000000000000000000007 /* Build configuration list for PBXNativeTarget "SwiftXDCCTests" */;
+			buildPhases = (
+				CA0000000000000000000004 /* Sources */,
+				CA0000000000000000000005 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				CA000000000000000000000A /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				CA0000000000000000000003 /* SwiftXDCCTests */,
+			);
+			name = SwiftXDCCTests;
+			packageProductDependencies = (
+			);
+			productName = SwiftXDCCTests;
+			productReference = CA0000000000000000000002 /* SwiftXDCCTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -159,6 +206,10 @@
 				TargetAttributes = {
 					BA8D369C2FDC3BD400F3F342 = {
 						CreatedOnToolsVersion = 26.5;
+					};
+					CA0000000000000000000001 = {
+						CreatedOnToolsVersion = 26.5;
+						TestTargetID = BA8D369C2FDC3BD400F3F342;
 					};
 				};
 			};
@@ -184,6 +235,7 @@
 			projectRoot = "";
 			targets = (
 				BA8D369C2FDC3BD400F3F342 /* SwiftXDCC */,
+				CA0000000000000000000001 /* SwiftXDCCTests */,
 			);
 		};
 /* End PBXProject section */
@@ -210,7 +262,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CA0000000000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		CA000000000000000000000A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BA8D369C2FDC3BD400F3F342 /* SwiftXDCC */;
+			targetProxy = CA000000000000000000000B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		BA8D36A62FDC3BD500F3F342 /* Debug */ = {
@@ -435,6 +502,46 @@
 			};
 			name = Release;
 		};
+		CA0000000000000000000008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6H3JCHA3QJ;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = vandermesis.SwiftXDCCTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SwiftXDCC.app/Contents/MacOS/SwiftXDCC";
+			};
+			name = Debug;
+		};
+		CA0000000000000000000009 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6H3JCHA3QJ;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = vandermesis.SwiftXDCCTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SwiftXDCC.app/Contents/MacOS/SwiftXDCC";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -452,6 +559,15 @@
 			buildConfigurations = (
 				BA8D36A92FDC3BD500F3F342 /* Debug */,
 				BA8D36AA2FDC3BD500F3F342 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		CA0000000000000000000007 /* Build configuration list for PBXNativeTarget "SwiftXDCCTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				CA0000000000000000000008 /* Debug */,
+				CA0000000000000000000009 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
