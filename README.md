@@ -13,8 +13,3 @@ All applilcation is written in Swift language using these great and important li
 - [swift-system](https://github.com/apple/swift-system)
 
 Work in progress
----
-![connect](ProductArtifacts/Connect.png)
-![console](ProductArtifacts/Console.png)
-![search](ProductArtifacts/Search.png)
----
